@@ -1,4 +1,7 @@
 module Main where
 
+import Stack2nix (test)
+
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = test
