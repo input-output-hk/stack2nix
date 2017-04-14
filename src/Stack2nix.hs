@@ -1,7 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack2nix (test) where
+module Stack2nix
+  ( Config(..)
+  , Package(..)
+  , RemotePkgConf(..)
+  , parseStackYaml
+  ) where
 
+import Data.ByteString (ByteString)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, unpack)
 import qualified Data.Yaml as Y
@@ -12,18 +18,18 @@ data Config =
          , packages  :: [Package]
          , extraDeps :: [Text]
          }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Package = LocalPkg FilePath
              | RemotePkg RemotePkgConf
-             deriving (Show)
+             deriving (Show, Eq)
 
 data RemotePkgConf =
   RemotePkgConf { gitUrl :: Text
                 , commit :: Text
                 , extraDep :: Bool
                 }
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance FromJSON Config where
   parseJSON (Y.Object v) =
@@ -47,9 +53,5 @@ instance FromJSON RemotePkgConf where
     return $ RemotePkgConf git commit extra
   parseJSON _ = fail "Expected Object for RemotePkgConf value"
 
-test :: IO ()
-test = do
-  conf <- Y.decodeFile sampleFile :: IO (Maybe Config)
-  putStrLn $ fromMaybe "..." (show <$> conf)
-  where
-    sampleFile = "test.yaml"
+parseStackYaml :: ByteString -> Maybe Config
+parseStackYaml = Y.decode
