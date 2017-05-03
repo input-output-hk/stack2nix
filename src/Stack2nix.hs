@@ -16,6 +16,7 @@ import Data.Monoid
 import Data.Text (Text, unpack)
 import qualified Data.Yaml as Y
 import Data.Yaml (FromJSON(..), (.:), (.:?), (.!=))
+import System.Directory (getHomeDirectory)
 import System.Exit
 import System.FilePath
 import System.FilePath.Glob
@@ -71,8 +72,9 @@ parseStackYaml = Y.decode
   * extraDep and extraDeps
 -}
 
--- TODO: factor out pure parts
-stack2nix :: FilePath -> IO ()
+-- TODO: Factor out pure parts.
+-- TODO: Use repo URI instead of path to stack.yaml.
+stack2nix :: String -> IO ()
 stack2nix fname = do
   yaml <- BS.readFile fname
   case parseStackYaml yaml of
@@ -106,9 +108,7 @@ toNix baseDir Config{..} = do
         , "compiler.override {"
         , "  overrides = self: super: {"
         ] ++ overrides ++
-        -- TODO: detect when it's appropriate to use justStaticExecutables
-        [ "    haskell-multi-proj-demo1-static = justStaticExecutables self.haskell-multi-proj-demo1;"
-        , "  };"
+        [ "  };"
         , "}"
         ]
 
@@ -129,10 +129,13 @@ runCabal2nix dir commit subpath = do
         Just x' -> takeWhile (/= '"') x'
         Nothing -> pname' xs
 
--- TODO: avoid calling process; use cabal2nix as lib
+-- TODO: Avoid calling process; use cabal2nix as lib. Would be simpler
+-- after upstream changes.
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO (Maybe String)
 cabal2nix dir commit subpath = do
-  (exitCode, stdout, _stderr) <- readProcessWithExitCode "/home/jake/.local/bin/cabal2nix" args ""
+  homeDir <- getHomeDirectory
+  -- TODO: Don't assume cabal2nix >=2.2 binary is installed to ~/.local/bin.
+  (exitCode, stdout, _stderr) <- readProcessWithExitCode (homeDir </> ".local/bin/cabal2nix") args ""
   case exitCode of
     ExitSuccess -> return $ Just stdout
     _ -> return Nothing

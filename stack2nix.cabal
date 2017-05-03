@@ -16,6 +16,7 @@ library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
                      , bytestring
+                     , directory
                      , filepath
                      , Glob
                      , process
@@ -29,6 +30,7 @@ executable stack2nix
   main-is:             Main.hs
   build-depends:       base >=4.9 && <4.10
                      , stack2nix
+                     , optparse-applicative
   hs-source-dirs:      stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010
