@@ -1,4 +1,7 @@
 dist/
 .stack-work/
+stack.yaml
 
 *~
+*.nix
+result
