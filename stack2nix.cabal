@@ -16,6 +16,9 @@ library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
                      , bytestring
+                     , filepath
+                     , Glob
+                     , process
                      , text
                      , yaml
   exposed-modules:     Stack2nix

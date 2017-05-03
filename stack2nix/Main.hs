@@ -1,4 +1,7 @@
 module Main where
 
+import Stack2nix
+import System.Environment
+
 main :: IO ()
-main = putStrLn "TODO"
+main = getArgs >>= (\[fname] -> stack2nix fname)
