@@ -2,9 +2,10 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Stack2nix
-  ( Config(..)
+  ( Args(..)
   , Package(..)
   , RemotePkgConf(..)
+  , StackConfig(..)
   , parseStackYaml
   , stack2nix
   ) where
@@ -14,16 +15,21 @@ import Data.Foldable
 import Data.List
 import Data.Monoid
 import Data.Text (Text, unpack)
-import qualified Data.Yaml as Y
 import Data.Yaml (FromJSON(..), (.:), (.:?), (.!=))
+import qualified Data.Yaml as Y
 import System.Directory (getHomeDirectory)
 import System.Exit
 import System.FilePath
 import System.FilePath.Glob
 import System.Process
 
-data Config =
-  Config { resolver  :: Text
+data Args = Args
+  { argUri :: String
+  }
+  deriving (Show)
+
+data StackConfig =
+  StackConfig { resolver  :: Text
          , packages  :: [Package]
          , extraDeps :: [Text]
          }
@@ -40,13 +46,13 @@ data RemotePkgConf =
                 }
   deriving (Show, Eq)
 
-instance FromJSON Config where
+instance FromJSON StackConfig where
   parseJSON (Y.Object v) =
-    Config <$>
+    StackConfig <$>
     v .: "resolver" <*>
     v .: "packages" <*>
     v .: "extra-deps"
-  parseJSON _ = fail "Expected Object for Config value"
+  parseJSON _ = fail "Expected Object for StackConfig value"
 
 instance FromJSON Package where
   parseJSON (Y.String v) = return $ LocalPkg $ unpack v
@@ -62,7 +68,7 @@ instance FromJSON RemotePkgConf where
     return $ RemotePkgConf git commit extra
   parseJSON _ = fail "Expected Object for RemotePkgConf value"
 
-parseStackYaml :: BS.ByteString -> Maybe Config
+parseStackYaml :: BS.ByteString -> Maybe StackConfig
 parseStackYaml = Y.decode
 
 {-
@@ -73,16 +79,16 @@ parseStackYaml = Y.decode
 -}
 
 -- TODO: Factor out pure parts.
--- TODO: Use repo URI instead of path to stack.yaml.
-stack2nix :: String -> IO ()
-stack2nix fname = do
-  yaml <- BS.readFile fname
+stack2nix :: Args -> IO ()
+stack2nix Args{..} = do
+  -- TODO: Support URIs from version control systems
+  yaml <- BS.readFile $ argUri </> "stack.yaml"
   case parseStackYaml yaml of
-    Just config -> toNix (takeDirectory fname) config
-    Nothing -> error $ "Failed to parse " <> fname
+    Just config -> toNix argUri config
+    Nothing -> error $ "Failed to parse " <> argUri
 
-toNix :: FilePath -> Config -> IO ()
-toNix baseDir Config{..} = do
+toNix :: FilePath -> StackConfig -> IO ()
+toNix baseDir StackConfig{..} = do
   traverse_ genNixFile packages
   nixFiles <- glob "*.nix"
   writeFile "default.nix" $ defaultNix $ map overrideFor nixFiles

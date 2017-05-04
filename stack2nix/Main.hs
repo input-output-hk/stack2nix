@@ -1,30 +1,16 @@
-{-# LANGUAGE RecordWildCards #-}
-
-module Main
-  ( Options
-  , main
-  , run
-  ) where
+module Main ( main ) where
 
 import Data.Semigroup ((<>))
-import Stack2nix
 import Options.Applicative
+import Stack2nix
 
-data Options = Options
-  { optUrl :: String
-  }
-  deriving (Show)
-
-options :: Parser Options
-options = Options
-          <$> strArgument (metavar "URI")
+args :: Parser Args
+args = Args
+       <$> strArgument (metavar "URI")
 
 main :: IO ()
-main = run =<< execParser opts
+main = stack2nix =<< execParser opts
   where
-    opts = info (options <**> helper) $
+    opts = info (args <**> helper) $
       fullDesc
       <> progDesc "this is a progDesc"
-
-run :: Options -> IO ()
-run Options{..} = stack2nix optUrl
