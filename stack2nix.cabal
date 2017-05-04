@@ -23,6 +23,10 @@ library
                      , text
                      , yaml
   exposed-modules:     Stack2nix
+  other-modules:       Stack2nix.External
+                     , Stack2nix.External.Cabal2nix
+                     , Stack2nix.External.VCS
+                     , Stack2nix.External.VCS.Git
   ghc-options:         -Wall
   default-language:    Haskell2010
 
