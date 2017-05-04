@@ -1,8 +1,8 @@
 module Main ( main ) where
 
-import Data.Semigroup ((<>))
-import Options.Applicative
-import Stack2nix
+import           Data.Semigroup      ((<>))
+import           Options.Applicative
+import           Stack2nix
 
 args :: Parser Args
 args = Args

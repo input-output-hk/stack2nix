@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack2nix
   ( Args(..)
@@ -10,40 +10,40 @@ module Stack2nix
   , stack2nix
   ) where
 
-import qualified Data.ByteString as BS
-import Data.Foldable
-import Data.List
-import Data.Monoid
-import Data.Text (Text, unpack)
-import Data.Yaml (FromJSON(..), (.:), (.:?), (.!=))
-import qualified Data.Yaml as Y
-import System.Directory (getHomeDirectory)
-import System.Exit
-import System.FilePath
-import System.FilePath.Glob
-import System.Process
+import qualified Data.ByteString      as BS
+import           Data.Foldable
+import           Data.List
+import           Data.Monoid
+import           Data.Text            (Text, unpack)
+import           Data.Yaml            (FromJSON (..), (.!=), (.:), (.:?))
+import qualified Data.Yaml            as Y
+import           System.Directory     (getHomeDirectory)
+import           System.Exit
+import           System.FilePath
+import           System.FilePath.Glob
+import           System.Process
 
 data Args = Args
   { argUri :: String
   }
   deriving (Show)
 
-data StackConfig =
-  StackConfig { resolver  :: Text
-         , packages  :: [Package]
-         , extraDeps :: [Text]
-         }
+data StackConfig = StackConfig
+  { resolver  :: Text
+  , packages  :: [Package]
+  , extraDeps :: [Text]
+  }
   deriving (Show, Eq)
 
 data Package = LocalPkg FilePath
              | RemotePkg RemotePkgConf
              deriving (Show, Eq)
 
-data RemotePkgConf =
-  RemotePkgConf { gitUrl :: Text
-                , commit :: Text
-                , extraDep :: Bool
-                }
+data RemotePkgConf = RemotePkgConf
+  { gitUrl   :: Text
+  , commit   :: Text
+  , extraDep :: Bool
+  }
   deriving (Show, Eq)
 
 instance FromJSON StackConfig where
@@ -81,11 +81,11 @@ parseStackYaml = Y.decode
 -- TODO: Factor out pure parts.
 stack2nix :: Args -> IO ()
 stack2nix Args{..} = do
-  -- TODO: Support URIs from version control systems
+  -- TODO: Support URIs from version control systems. (Use nix-prefetch-git for git
   yaml <- BS.readFile $ argUri </> "stack.yaml"
   case parseStackYaml yaml of
     Just config -> toNix argUri config
-    Nothing -> error $ "Failed to parse " <> argUri
+    Nothing     -> error $ "Failed to parse " <> argUri
 
 toNix :: FilePath -> StackConfig -> IO ()
 toNix baseDir StackConfig{..} = do
@@ -123,7 +123,7 @@ runCabal2nix dir commit subpath = do
   result <- cabal2nix dir commit subpath
   case result of
     Just nix -> writeFile (pname nix <> ".nix") nix
-    Nothing -> error $ "cabal2nix failed on directory: " <> dir
+    Nothing  -> error $ "cabal2nix failed on directory: " <> dir
   where
     pname :: String -> String
     pname = pname' . lines
@@ -144,7 +144,7 @@ cabal2nix dir commit subpath = do
   (exitCode, stdout, _stderr) <- readProcessWithExitCode (homeDir </> ".local/bin/cabal2nix") args ""
   case exitCode of
     ExitSuccess -> return $ Just stdout
-    _ -> return Nothing
+    _           -> return Nothing
   where
     args :: [String]
     args = concat

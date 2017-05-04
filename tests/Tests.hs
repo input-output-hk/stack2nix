@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 
-import Stack2nix
+import           Stack2nix
 
-import Data.ByteString (ByteString)
-import Test.Hspec
-import Text.RawString.QQ
+import           Data.ByteString   (ByteString)
+import           Test.Hspec
+import           Text.RawString.QQ
 
 main :: IO ()
 main = hspec $
