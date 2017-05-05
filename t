@@ -15,7 +15,7 @@ build_repo() {
     local repo=$2
     local build_target=$3
 
-    rm *.nix
+    rm -f *.nix
     echo "Running stack2nix on $repo"
     ${STACK} exec stack2nix -- $repo || (echo -e "${RED}FAIL: stack2nix: $description${NC}"; exit 1)
 
@@ -26,6 +26,7 @@ build_repo() {
     echo ""
 }
 
+${STACK} init
 ${STACK} build
 
 build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
