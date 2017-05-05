@@ -1,4 +1,4 @@
-{ mkDerivation, base, bytestring, Cabal, cabal2nix, directory, filepath, git, Glob
+{ mkDerivation, base, bytestring, Cabal, cabal2nix, cabal-install, directory, filepath, git, Glob
 , hspec, optparse-applicative, process, raw-strings-qq, stdenv
 , temporary, text, yaml
 }:
@@ -15,7 +15,7 @@ mkDerivation {
   testHaskellDepends = [
     base bytestring Cabal hspec raw-strings-qq
   ];
-  testSystemDepends = [ cabal2nix git ];
+  testSystemDepends = [ cabal2nix cabal-install git ];
   description = "Convert stack.yaml files into Nix build instructions.";
   license = stdenv.lib.licenses.bsd3;
 }
