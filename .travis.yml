@@ -5,4 +5,4 @@ before_install:
   - travis_retry curl -L https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64 | tar xz --strip-components=1 -C ~/.local/bin
   - ls -la ~/.local/bin
 script:
-  - nix-shell -p git -p cabal2nix ./t
+  - nix-shell -p haskellPackages.ghc -p git -p cabal2nix ./t
