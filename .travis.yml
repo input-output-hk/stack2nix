@@ -1,3 +1,5 @@
 language: nix
+install:
+  - nix-env -i stack
 script:
   ./t
