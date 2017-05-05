@@ -1,5 +1,8 @@
 language: nix
-install:
-  - nix-env -i stack
+before_install:
+  - echo $TRAVIS_OS_NAME
+  - mkdir -p ~/.local/bin
+  - export PATH="$HOME/.local/bin:$PATH"
+  - travis_retry curl -L https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64 | tar xz --strip-components=1 -C ~/.local/bin
 script:
-  ./t
+  - nix-shell -p git -p cabal2nix ./t
