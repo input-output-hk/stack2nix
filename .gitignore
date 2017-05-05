@@ -3,5 +3,4 @@ dist/
 stack.yaml
 
 *~
-*.nix
 result
