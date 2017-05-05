@@ -23,6 +23,7 @@ build_repo() {
     echo ""
 }
 
+which stack || export PATH="$HOME/.local/bin:$PATH"
 stack build
 
 build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
