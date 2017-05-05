@@ -1,5 +1,6 @@
 module Stack2nix.External.VCS.Git
-  ( git
+  ( Command(..), ExternalCmd(..), InternalCmd(..)
+  , git
   ) where
 
 import           Stack2nix.External.Util (runCmd, runCmdFrom)
@@ -9,7 +10,7 @@ data Command = OutsideRepo ExternalCmd
 data ExternalCmd = Clone String FilePath
 data InternalCmd = Checkout CommitRef
 
-data CommitRef = Sha1 String
+type CommitRef = String
 
 exe :: String
 exe = "git"
@@ -25,7 +26,4 @@ runExternal (Clone uri dir) =
 
 runInternal :: FilePath -> InternalCmd -> IO ()
 runInternal repoDir (Checkout ref) =
-  runCmdFrom repoDir exe ["checkout", showRef ref] $ return mempty
-  where
-    showRef :: CommitRef -> String
-    showRef (Sha1 hash) = hash
+  runCmdFrom repoDir exe ["checkout", ref] $ return mempty

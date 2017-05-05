@@ -10,19 +10,23 @@ module Stack2nix
   , stack2nix
   ) where
 
-import qualified Data.ByteString      as BS
-import           Data.Foldable        (traverse_)
-import           Data.Monoid          ((<>))
-import           Data.Text            (Text, unpack)
-import           Data.Yaml            (FromJSON (..), (.!=), (.:), (.:?))
-import qualified Data.Yaml            as Y
-import           Stack2nix.External   (cabal2nix)
-import           Stack2nix.Repo       (readRepoFile)
-import           System.FilePath      (dropExtension, takeFileName, (</>))
-import           System.FilePath.Glob (glob)
+import qualified Data.ByteString            as BS
+import           Data.Foldable              (traverse_)
+import           Data.Monoid                ((<>))
+import           Data.Text                  (Text, unpack)
+import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
+import qualified Data.Yaml                  as Y
+import           Stack2nix.External         (cabal2nix)
+import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
+                                             InternalCmd (..), git)
+import           System.Directory           (doesFileExist)
+import           System.FilePath            (dropExtension, takeFileName, (</>))
+import           System.FilePath.Glob       (glob)
+import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
-  { argUri :: String
+  { argRev :: Maybe String
+  , argUri :: String
   }
   deriving (Show)
 
@@ -79,25 +83,44 @@ parseStackYaml = Y.decode
 -- TODO: Factor out pure parts.
 stack2nix :: Args -> IO ()
 stack2nix Args{..} = do
-  yaml <- readRepoFile argUri "stack.yaml"
-  case parseStackYaml yaml of
-    Just config -> toNix argUri config
-    Nothing     -> error $ "Failed to parse " <> argUri
+  isLocalRepo <- doesFileExist (argUri </> "stack.yaml")
+  if isLocalRepo
+  then handleStackConfig False =<< BS.readFile (argUri </> "stack.yaml")
+  else handleStackConfig True =<< withSystemTempDirectory "s2n-" tryGit
+  where
+    tryGit :: FilePath -> IO BS.ByteString
+    tryGit tmpDir = do
+      git (OutsideRepo (Clone argUri tmpDir))
+      case argRev of
+        Just r  -> git (InsideRepo tmpDir (Checkout r))
+        Nothing -> return mempty
+      BS.readFile (tmpDir </> "stack.yaml")
 
-toNix :: FilePath -> StackConfig -> IO ()
-toNix baseDir StackConfig{..} = do
+    handleStackConfig :: Bool -> BS.ByteString -> IO ()
+    handleStackConfig isRemote yaml = do
+      case parseStackYaml yaml of
+        Just config -> toNix isRemote argUri config
+        Nothing     -> error $ "Failed to parse " <> argUri
+
+toNix :: Bool -> FilePath -> StackConfig -> IO ()
+toNix isRemote baseDir StackConfig{..} = do
   traverse_ genNixFile packages
   nixFiles <- glob "*.nix"
   writeFile "default.nix" $ defaultNix $ map overrideFor nixFiles
     where
       genNixFile :: Package -> IO ()
-      genNixFile (LocalPkg relPath) = cabal2nix dir Nothing Nothing
+      genNixFile (LocalPkg relPath) = do
+        cabal2nix dir Nothing (Just relPath)
         where
-          dir = if relPath == "." then baseDir else baseDir </> relPath
-      genNixFile (RemotePkg RemotePkgConf{..}) = cabal2nix (unpack gitUrl) (Just commit) Nothing
+          dir =
+            if isRemote || relPath == "."
+            then baseDir
+            else baseDir </> relPath
+      genNixFile (RemotePkg RemotePkgConf{..}) =
+        cabal2nix (unpack gitUrl) (Just commit) Nothing
 
       overrideFor :: FilePath -> String
-      overrideFor nixFile = "    " <> name <> " = super.callPackage " <> nixFile <> " { };"
+      overrideFor nixFile = "    " <> name <> " = super.callPackage ./" <> name <> ".nix { };"
         where
           name = dropExtension $ takeFileName nixFile
 

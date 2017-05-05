@@ -20,6 +20,7 @@ library
                      , filepath
                      , Glob
                      , process
+                     , temporary
                      , text
                      , yaml
   exposed-modules:     Stack2nix
@@ -28,7 +29,6 @@ library
                      , Stack2nix.External.VCS
                      , Stack2nix.External.VCS.Git
                      , Stack2nix.External.Util
-                     , Stack2nix.Repo
   ghc-options:         -Wall
   default-language:    Haskell2010
 

@@ -6,7 +6,8 @@ import           Stack2nix
 
 args :: Parser Args
 args = Args
-       <$> strArgument (metavar "URI")
+       <$> optional (strOption $ long "revision" <> help "revision to use when fetching from VCS")
+       <*> strArgument (metavar "URI")
 
 main :: IO ()
 main = stack2nix =<< execParser opts
