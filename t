@@ -23,7 +23,11 @@ build_repo() {
     echo ""
 }
 
+# TODO: Assumptions about stack configuration may affect your
+# system. Currently the focus is getting the project to work on Travis
+# CI.
 which stack || export PATH="$HOME/.local/bin:$PATH"
+stack config set system-ghc --global true
 stack build
 
 build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
