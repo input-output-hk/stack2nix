@@ -1,2 +1,2 @@
 language: nix
-script: nix-shell --comand ./t
+script: nix-shell --command ./t
