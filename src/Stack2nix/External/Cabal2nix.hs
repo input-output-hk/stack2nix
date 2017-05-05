@@ -1,21 +1,18 @@
 module Stack2nix.External.Cabal2nix (
-  runCabal2nix
+  cabal2nix
   ) where
 
-import           Data.List      (stripPrefix, takeWhile)
-import           Data.Monoid    ((<>))
-import           Data.Text      (Text, unpack)
-import           System.Exit    (ExitCode (..))
-import           System.Process (proc, readCreateProcessWithExitCode)
+import           Data.List               (stripPrefix, takeWhile)
+import           Data.Monoid             ((<>))
+import           Data.Text               (Text, unpack)
+import           Stack2nix.External.Util (runCmd)
 
 -- Requires cabal2nix >= 2.2 in PATH
-runCabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO ()
-runCabal2nix dir commit subpath = do
-  (exitCode, stdout, _stderr) <- readCreateProcessWithExitCode (proc "cabal2nix" args) ""
-  case exitCode of
-    ExitSuccess -> writeFile (pname stdout <> ".nix") stdout
-    _           -> error $ "cabal2nix failed on directory: " <> dir
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO ()
+cabal2nix dir commit subpath = runCmd exe args $ (\stdout -> writeFile (pname stdout <> ".nix") stdout)
   where
+    exe = "cabal2nix"
+
     args :: [String]
     args = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit

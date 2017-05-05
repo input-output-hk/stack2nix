@@ -16,7 +16,8 @@ import           Data.Monoid          ((<>))
 import           Data.Text            (Text, unpack)
 import           Data.Yaml            (FromJSON (..), (.!=), (.:), (.:?))
 import qualified Data.Yaml            as Y
-import           Stack2nix.External   (runCabal2nix)
+import           Stack2nix.External   (cabal2nix)
+import           Stack2nix.Repo       (readRepoFile)
 import           System.FilePath      (dropExtension, takeFileName, (</>))
 import           System.FilePath.Glob (glob)
 
@@ -78,8 +79,7 @@ parseStackYaml = Y.decode
 -- TODO: Factor out pure parts.
 stack2nix :: Args -> IO ()
 stack2nix Args{..} = do
-  -- TODO: Support URIs from version control systems. (Use nix-prefetch-git for git
-  yaml <- BS.readFile $ argUri </> "stack.yaml"
+  yaml <- readRepoFile argUri "stack.yaml"
   case parseStackYaml yaml of
     Just config -> toNix argUri config
     Nothing     -> error $ "Failed to parse " <> argUri
@@ -91,10 +91,10 @@ toNix baseDir StackConfig{..} = do
   writeFile "default.nix" $ defaultNix $ map overrideFor nixFiles
     where
       genNixFile :: Package -> IO ()
-      genNixFile (LocalPkg relPath) = runCabal2nix dir Nothing Nothing
+      genNixFile (LocalPkg relPath) = cabal2nix dir Nothing Nothing
         where
           dir = if relPath == "." then baseDir else baseDir </> relPath
-      genNixFile (RemotePkg RemotePkgConf{..}) = runCabal2nix (unpack gitUrl) (Just commit) Nothing
+      genNixFile (RemotePkg RemotePkgConf{..}) = cabal2nix (unpack gitUrl) (Just commit) Nothing
 
       overrideFor :: FilePath -> String
       overrideFor nixFile = "    " <> name <> " = super.callPackage " <> nixFile <> " { };"
