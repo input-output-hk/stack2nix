@@ -1,2 +1,2 @@
 language: nix
-script: nix-shell --pure -p stack -p haskellPackages.ghc -p git -p cabal2nix ./t
+script: nix-shell --pure -p stack -p haskellPackages.ghc -p git -p cabal2nix --run ./t

@@ -2,6 +2,8 @@
 
 set -e
 
+echo "PATH is $PATH"
+
 STACK="stack --system-ghc"
 
 RED="\033[1;31m"
@@ -12,7 +14,6 @@ build_repo() {
     local description=$1
     local repo=$2
     local build_target=$3
-    local job="$description: $repo; $build_target"
 
     rm *.nix
     echo "Running stack2nix on $repo"
