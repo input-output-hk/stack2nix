@@ -103,19 +103,15 @@ stack2nix Args{..} = do
         Nothing     -> error $ "Failed to parse " <> argUri
 
 toNix :: Bool -> FilePath -> StackConfig -> IO ()
-toNix isRemote baseDir StackConfig{..} = do
+toNix _isRemote baseDir StackConfig{..} = do
   traverse_ genNixFile packages
   nixFiles <- glob "*.nix"
   writeFile "default.nix" $ defaultNix $ map overrideFor nixFiles
     where
       genNixFile :: Package -> IO ()
-      genNixFile (LocalPkg relPath) = do
-        cabal2nix dir Nothing (Just relPath)
+      genNixFile (LocalPkg relPath) =
+        cabal2nix baseDir Nothing (Just relPath)
         where
-          dir =
-            if isRemote || relPath == "."
-            then baseDir
-            else baseDir </> relPath
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing
 
