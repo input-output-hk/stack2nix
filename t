@@ -47,9 +47,6 @@ run_tests() {
     local clone_dir="$(mktemp -d)"
     git clone https://github.com/jmitchell/haskell-multi-package-demo1 "$clone_dir"
     build_repo "Local simple" "$clone_dir" haskell-multi-proj-demo1
-
-    build_repo "Remote Cardano-SL" https://github.com/input-output-hk/cardano-sl cardano-sl
-    build_repo "Remote Cardano-SL-Explorer" https://github.com/input-output-hk/cardano-sl-explorer cardano-sl-explorer
 }
 
 build_self && run_tests
