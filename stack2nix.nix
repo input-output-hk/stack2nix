@@ -1,5 +1,5 @@
 { mkDerivation, base, bytestring, Cabal, cabal2nix, cabal-install
-, directory, filepath, gitAndTools, Glob, hspec
+, directory, filepath, gitAndTools, Glob, hspec, nix-prefetch-git
 , optparse-applicative, process, raw-strings-qq, stdenv
 , temporary, text, which, yaml
 }:
@@ -20,6 +20,7 @@ mkDerivation {
     cabal2nix
     cabal-install
     gitAndTools.gitFull
+    nix-prefetch-git
     which
   ];
   description = "Convert stack.yaml files into Nix build instructions.";
