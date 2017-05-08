@@ -29,7 +29,7 @@ flags: {}
 
 extra-package-dbs: []
 |]
-      let config = Config { resolver = "lts-8.9"
+      let config = StackConfig { resolver = "lts-8.9"
                 , packages = [ LocalPkg "."
                              , LocalPkg "dep1"
                              , LocalPkg "dep2"
