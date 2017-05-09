@@ -11,6 +11,7 @@ build_self() {
     local bin="$(mktemp -d)/bin"
 
     echo -e "${YELLOW}Building stack2nix...${NC}"
+    cabal update
     cabal sandbox init
     cabal configure
     cabal build
