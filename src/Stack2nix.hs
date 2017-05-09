@@ -15,7 +15,7 @@ import           Data.Fix                   (Fix (..))
 import           Data.Foldable              (traverse_)
 import           Data.Map.Strict            (member)
 import           Data.Monoid                ((<>))
-import           Data.Text                  (Text, pack, unpack)
+import           Data.Text                  (Text, intercalate, pack, unpack)
 import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
 import qualified Data.Yaml                  as Y
 import           Nix.Expr                   (NExprF (..), ParamSet (..),
@@ -110,6 +110,7 @@ stack2nix Args{..} = do
 toNix :: Bool -> FilePath -> StackConfig -> IO ()
 toNix _isRemote baseDir StackConfig{..} = do
   traverse_ genNixFile packages
+  putStrLn . unpack $ "TODO: handle extra-deps section:\n  " <> intercalate "\n  " extraDeps
   nixFiles <- glob "*.nix"
   overrides <- mapM overrideFor nixFiles
   writeFile "default.nix" $ defaultNix overrides
@@ -117,7 +118,6 @@ toNix _isRemote baseDir StackConfig{..} = do
       genNixFile :: Package -> IO ()
       genNixFile (LocalPkg relPath) =
         cabal2nix baseDir Nothing (Just relPath)
-        where
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing
 
