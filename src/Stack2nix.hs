@@ -11,11 +11,16 @@ module Stack2nix
   ) where
 
 import qualified Data.ByteString            as BS
+import           Data.Fix                   (Fix (..))
 import           Data.Foldable              (traverse_)
+import           Data.Map.Strict            (member)
 import           Data.Monoid                ((<>))
-import           Data.Text                  (Text, unpack)
+import           Data.Text                  (Text, pack, unpack)
 import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
 import qualified Data.Yaml                  as Y
+import           Nix.Expr                   (NExprF (..), ParamSet (..),
+                                             Params (..))
+import           Nix.Parser                 (Result (..), parseNixFile)
 import           Stack2nix.External         (cabal2nix)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
@@ -106,7 +111,8 @@ toNix :: Bool -> FilePath -> StackConfig -> IO ()
 toNix _isRemote baseDir StackConfig{..} = do
   traverse_ genNixFile packages
   nixFiles <- glob "*.nix"
-  writeFile "default.nix" $ defaultNix $ map overrideFor nixFiles
+  overrides <- mapM overrideFor nixFiles
+  writeFile "default.nix" $ defaultNix overrides
     where
       genNixFile :: Package -> IO ()
       genNixFile (LocalPkg relPath) =
@@ -115,10 +121,31 @@ toNix _isRemote baseDir StackConfig{..} = do
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing
 
-      overrideFor :: FilePath -> String
-      overrideFor nixFile = "    " <> name <> " = super.callPackage ./" <> name <> ".nix { };"
+      overrideFor :: FilePath -> IO String
+      overrideFor nixFile = do
+        deps <- externalDeps
+        return $ "    " <> name <> " = super.callPackage ./" <> name <> ".nix { " <> deps <> " };"
         where
           name = dropExtension $ takeFileName nixFile
+
+          externalDeps :: IO String
+          externalDeps = do
+            collide <- hasNameCollision nixFile
+            return $ if collide
+                     then name <> " = pkgs." <> name <> ";"
+                     else ""
+
+          hasNameCollision :: FilePath -> IO Bool
+          hasNameCollision nixFile = do
+            nf <- parseNixFile nixFile
+            case nf of
+              Success expr -> do
+                case expr of
+                  Fix (NAbs (ParamSet (FixedParamSet deps) _) _) ->
+                    return $ member (pack name) deps
+                  _ -> return False
+              Failure err -> error $ show err
+
 
       defaultNix overrides = unlines $
         [ "{ pkgs ? (import <nixpkgs> {})"

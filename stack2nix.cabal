@@ -16,9 +16,12 @@ library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
                      , bytestring
+                     , containers
+                     , data-fix
                      , directory
                      , filepath
                      , Glob
+                     , hnix >= 0.3.4
                      , process
                      , temporary
                      , text
