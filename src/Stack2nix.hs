@@ -69,10 +69,10 @@ instance FromJSON Package where
 instance FromJSON RemotePkgConf where
   parseJSON (Y.Object v) = do
     loc <- v .: "location"
-    git <- loc .: "git"
+    gitUrl <- loc .: "git"
     commit <- loc .: "commit"
     extra <- v .:? "extra-dep" .!= False
-    return $ RemotePkgConf git commit extra
+    return $ RemotePkgConf gitUrl commit extra
   parseJSON _ = fail "Expected Object for RemotePkgConf value"
 
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
@@ -136,8 +136,8 @@ toNix _isRemote baseDir StackConfig{..} = do
                      else ""
 
           hasNameCollision :: FilePath -> IO Bool
-          hasNameCollision nixFile = do
-            nf <- parseNixFile nixFile
+          hasNameCollision fname = do
+            nf <- parseNixFile fname
             case nf of
               Success expr -> do
                 case expr of
