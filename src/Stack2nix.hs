@@ -82,7 +82,6 @@ parseStackYaml = Y.decode
   Unused parts of sample input stack.yaml
 
   * resolver
-  * extraDep and extraDeps
 -}
 
 -- TODO: Factor out pure parts.
@@ -110,7 +109,7 @@ stack2nix Args{..} = do
 toNix :: Bool -> FilePath -> StackConfig -> IO ()
 toNix _isRemote baseDir StackConfig{..} = do
   traverse_ genNixFile packages
-  putStrLn . unpack $ "TODO: handle extra-deps section:\n  " <> intercalate "\n  " extraDeps
+  mapM_ handleExtraDep extraDeps
   nixFiles <- glob "*.nix"
   overrides <- mapM overrideFor nixFiles
   writeFile "default.nix" $ defaultNix overrides
@@ -120,6 +119,9 @@ toNix _isRemote baseDir StackConfig{..} = do
         cabal2nix baseDir Nothing (Just relPath)
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing
+
+      handleExtraDep :: Text -> IO ()
+      handleExtraDep dep = cabal2nix ("cabal://" <> unpack dep) Nothing Nothing
 
       overrideFor :: FilePath -> IO String
       overrideFor nixFile = do
@@ -145,7 +147,6 @@ toNix _isRemote baseDir StackConfig{..} = do
                     return $ member (pack name) deps
                   _ -> return False
               Failure err -> error $ show err
-
 
       defaultNix overrides = unlines $
         [ "{ pkgs ? (import <nixpkgs> {})"

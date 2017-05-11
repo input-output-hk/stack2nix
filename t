@@ -54,6 +54,9 @@ run_tests() {
 
     # Haskell package whose name matches one of its external dependencies
     build_repo "Remote rocksdb-haskell" https://github.com/serokell/rocksdb-haskell rocksdb
+
+    # An extra-dep of cardano-sl
+    build_repo "Remote cardano-crypto" https://github.com/input-output-hk/cardano-crypto cardano-crypto
 }
 
 build_self && run_tests

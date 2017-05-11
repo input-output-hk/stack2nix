@@ -9,7 +9,7 @@ import           Stack2nix.External.Util (runCmd)
 
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO ()
-cabal2nix dir commit subpath = runCmd exe args $ (\stdout -> writeFile (pname stdout <> ".nix") stdout)
+cabal2nix uri commit subpath = runCmd exe args $ (\stdout -> writeFile (pname stdout <> ".nix") stdout)
   where
     exe = "cabal2nix"
 
@@ -17,7 +17,7 @@ cabal2nix dir commit subpath = runCmd exe args $ (\stdout -> writeFile (pname st
     args = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , maybe [] (\d -> ["--subpath", d]) subpath
-      , [dir]
+      , [uri]
       ]
 
     pname :: String -> String
