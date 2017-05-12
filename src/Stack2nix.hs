@@ -115,12 +115,9 @@ toNix _isRemote baseDir rev StackConfig{..} = do
   writeFile "default.nix" $ defaultNix overrides
     where
       genNixFile :: Package -> IO ()
-      genNixFile (LocalPkg ".") =
-        cabal2nix baseDir (pack <$> rev) Nothing
       genNixFile (LocalPkg relPath) =
-        -- TODO: Assumes, perhaps incorrectly, that the relPath points
-        -- to a subdirectory in the same repo, and therefore uses the
-        -- same rev.
+        -- TODO: Assumes that the relPath points to a subdirectory in
+        -- the same repo, and therefore uses the same rev.
         cabal2nix baseDir (pack <$> rev) (Just relPath)
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing

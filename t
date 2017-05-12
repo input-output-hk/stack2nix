@@ -27,12 +27,16 @@ build_repo() {
     local description=$1
     local repo=$2
     local build_target=$3
-    local rev="${4:-master}"
+    local rev=
     local work_dir="$(mktemp -d)"
+
+    if [ ! -z ${4} ]; then
+        rev="--revision $4"
+    fi
 
     echo -e "${YELLOW}Running stack2nix on $repo${NC}"
     pushd "$work_dir"
-    stack2nix --revision "$rev" $repo || (echo -e "${RED}FAIL: stack2nix: $description${NC}"; popd; exit 1)
+    stack2nix $rev $repo || (echo -e "${RED}FAIL: stack2nix: $description${NC}"; popd; exit 1)
 
     echo -e "${YELLOW}Running nix-build on $build_target${NC}"
     nix-build -A $build_target --show-trace || (echo -e "${RED}FAIL: nix-build: $description${NC}"; popd; exit 1)
