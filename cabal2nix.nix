@@ -6,11 +6,11 @@
 }:
 mkDerivation {
   pname = "cabal2nix";
-  version = "2.2";
+  version = "2.2.1";
   src = fetchgit {
     url = "https://github.com/NixOS/cabal2nix";
-    sha256 = "084x2npqkdfhlrzxk1b8lhxjk90zbj1p6wmsbmrp3j6iahdr5bfk";
-    rev = "d2334f4e68a6a7d5a4a2b62dff0e62f81800a0b2";
+    sha256 = "1ia2iw137sza655b0hf4hghpmjbsg3gz3galpvr5pbbsljp26m6p";
+    rev = "b6834fd420e0223d0d57f8f98caeeb6ac088be88";
   };
   isLibrary = true;
   isExecutable = true;
