@@ -103,11 +103,11 @@ stack2nix Args{..} = do
     handleStackConfig :: Bool -> BS.ByteString -> IO ()
     handleStackConfig isRemote yaml = do
       case parseStackYaml yaml of
-        Just config -> toNix isRemote argUri config
+        Just config -> toNix isRemote argUri argRev config
         Nothing     -> error $ "Failed to parse " <> argUri
 
-toNix :: Bool -> FilePath -> StackConfig -> IO ()
-toNix _isRemote baseDir StackConfig{..} = do
+toNix :: Bool -> FilePath -> Maybe String -> StackConfig -> IO ()
+toNix _isRemote baseDir rev StackConfig{..} = do
   traverse_ genNixFile packages
   mapM_ handleExtraDep extraDeps
   nixFiles <- glob "*.nix"
@@ -115,6 +115,8 @@ toNix _isRemote baseDir StackConfig{..} = do
   writeFile "default.nix" $ defaultNix overrides
     where
       genNixFile :: Package -> IO ()
+      genNixFile (LocalPkg ".") =
+        cabal2nix baseDir (pack <$> rev) Nothing
       genNixFile (LocalPkg relPath) =
         cabal2nix baseDir Nothing (Just relPath)
       genNixFile (RemotePkg RemotePkgConf{..}) =
