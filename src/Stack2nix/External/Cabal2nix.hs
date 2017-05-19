@@ -9,7 +9,11 @@ import           Stack2nix.External.Util (runCmd)
 
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO ()
-cabal2nix uri commit subpath = runCmd exe args $ (\stdout -> writeFile (pname stdout <> ".nix") stdout)
+cabal2nix uri commit subpath = do
+  result <- runCmd exe args
+  case result of
+    Right stdout -> writeFile (pname stdout <> ".nix") stdout
+    Left stderr  -> error stderr
   where
     exe = "cabal2nix"
 

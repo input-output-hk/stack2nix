@@ -3,7 +3,7 @@ module Stack2nix.External.VCS.Git
   , git
   ) where
 
-import           Stack2nix.External.Util (runCmd, runCmdFrom)
+import           Stack2nix.External.Util (failHard, runCmd, runCmdFrom)
 
 data Command = OutsideRepo ExternalCmd
              | InsideRepo FilePath InternalCmd
@@ -21,9 +21,9 @@ git (OutsideRepo cmd)    = runExternal cmd
 git (InsideRepo dir cmd) = runInternal dir cmd
 
 runExternal :: ExternalCmd -> IO ()
-runExternal (Clone uri dir) =
-  runCmd exe ["clone", uri, dir] $ return mempty
+runExternal (Clone uri dir) = do
+   runCmd exe ["clone", uri, dir] >>= failHard
 
 runInternal :: FilePath -> InternalCmd -> IO ()
-runInternal repoDir (Checkout ref) =
-  runCmdFrom repoDir exe ["checkout", ref] $ return mempty
+runInternal repoDir (Checkout ref) = do
+   runCmdFrom repoDir exe ["checkout", ref] >>= failHard
