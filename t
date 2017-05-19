@@ -52,17 +52,7 @@ run_tests() {
 
     build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
 
-    local clone_dir="$(mktemp -d)"
-    git clone https://github.com/jmitchell/haskell-multi-package-demo1 "$clone_dir"
-    build_repo "Local simple" "$clone_dir" haskell-multi-proj-demo1
-
-    # Haskell package whose name matches one of its external dependencies
-    build_repo "Remote rocksdb-haskell" https://github.com/serokell/rocksdb-haskell rocksdb
-
-    # An extra-dep of cardano-sl
-    build_repo "Remote cardano-crypto" https://github.com/input-output-hk/cardano-crypto cardano-crypto
-
-    build_repo "Remote cardano-sl" https://github.com/input-output-hk/cardano-sl.git cardano-sl be7cb65f71e7bd5b34778652009469c4513ecb79
+    # build_repo "Remote cardano-sl" https://github.com/input-output-hk/cardano-sl.git cardano-sl be7cb65f71e7bd5b34778652009469c4513ecb79
 }
 
 build_self && run_tests
