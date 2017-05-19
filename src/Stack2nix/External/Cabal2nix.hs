@@ -17,6 +17,7 @@ cabal2nix uri commit subpath = runCmd exe args $ (\stdout -> writeFile (pname st
     args = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , maybe [] (\d -> ["--subpath", d]) subpath
+      , ["--no-check"]          -- TODO: only use on repos that need it.
       , [uri]
       ]
 

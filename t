@@ -61,6 +61,8 @@ run_tests() {
 
     # An extra-dep of cardano-sl
     build_repo "Remote cardano-crypto" https://github.com/input-output-hk/cardano-crypto cardano-crypto
+
+    build_repo "Remote cardano-sl" https://github.com/input-output-hk/cardano-sl.git cardano-sl be7cb65f71e7bd5b34778652009469c4513ecb79
 }
 
 build_self && run_tests

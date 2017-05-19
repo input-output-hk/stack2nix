@@ -7,6 +7,8 @@ import           System.Exit      (ExitCode (..))
 import           System.Process   (CreateProcess (..))
 import           System.Process   (proc, readCreateProcessWithExitCode)
 
+-- TODO: replace `(String -> IO ()) -> IO ()` with `IO String`
+
 runCmdFrom :: FilePath -> String -> [String] -> (String -> IO ()) -> IO ()
 runCmdFrom dir prog args onSuccess = do
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""

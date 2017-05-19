@@ -13,9 +13,10 @@ module Stack2nix
 import qualified Data.ByteString            as BS
 import           Data.Fix                   (Fix (..))
 import           Data.Foldable              (traverse_)
-import           Data.Map.Strict            (member)
+import           Data.List                  (isPrefixOf)
+import           Data.Map.Strict            (keys)
 import           Data.Monoid                ((<>))
-import           Data.Text                  (Text, intercalate, pack, unpack)
+import           Data.Text                  (Text, pack, unpack)
 import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
 import qualified Data.Yaml                  as Y
 import           Nix.Expr                   (NExprF (..), ParamSet (..),
@@ -27,6 +28,7 @@ import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
 import           System.Directory           (doesFileExist)
 import           System.FilePath            (dropExtension, takeFileName, (</>))
 import           System.FilePath.Glob       (glob)
+import           System.IO                  (hPutStrLn, stderr)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
@@ -116,39 +118,49 @@ toNix _isRemote baseDir rev StackConfig{..} = do
     where
       genNixFile :: Package -> IO ()
       genNixFile (LocalPkg relPath) =
-        -- TODO: Assumes that the relPath points to a subdirectory in
-        -- the same repo, and therefore uses the same rev.
+        -- Assumes that the relPath points to a subdirectory in the
+        -- same repo, and therefore uses the same rev.
         cabal2nix baseDir (pack <$> rev) (Just relPath)
       genNixFile (RemotePkg RemotePkgConf{..}) =
         cabal2nix (unpack gitUrl) (Just commit) Nothing
 
       handleExtraDep :: Text -> IO ()
-      handleExtraDep dep = cabal2nix ("cabal://" <> unpack dep) Nothing Nothing
+      handleExtraDep dep =
+        -- TODO: Define an extra-dep blacklist and make enforcement more robust.
+        if shouldSkip (unpack dep)
+        then hPutStrLn stderr $ "Skipping extra-dep '" <> unpack dep <> "'"
+        else cabal2nix ("cabal://" <> unpack dep) Nothing Nothing
+
+        where
+          shouldSkip :: String -> Bool
+          shouldSkip p = "base-" `isPrefixOf` p || "directory-" `isPrefixOf` p
+
+      nameOf :: FilePath -> String
+      nameOf = dropExtension . takeFileName
 
       overrideFor :: FilePath -> IO String
       overrideFor nixFile = do
         deps <- externalDeps
-        return $ "    " <> name <> " = super.callPackage ./" <> name <> ".nix { " <> deps <> " };"
+        return $ "    " <> nameOf nixFile <> " = super.callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
         where
-          name = dropExtension $ takeFileName nixFile
-
           externalDeps :: IO String
           externalDeps = do
-            collide <- hasNameCollision nixFile
-            return $ if collide
+            deps <- nixFileDeps nixFile
+            let name = nameOf nixFile
+            return $ if name `elem` deps
                      then name <> " = pkgs." <> name <> ";"
                      else ""
 
-          hasNameCollision :: FilePath -> IO Bool
-          hasNameCollision fname = do
-            nf <- parseNixFile fname
-            case nf of
-              Success expr -> do
-                case expr of
-                  Fix (NAbs (ParamSet (FixedParamSet deps) _) _) ->
-                    return $ member (pack name) deps
-                  _ -> return False
-              Failure err -> error $ show err
+      nixFileDeps :: FilePath -> IO [String]
+      nixFileDeps fname = do
+        nf <- parseNixFile fname
+        case nf of
+          Success expr -> do
+            case expr of
+              Fix (NAbs (ParamSet (FixedParamSet deps) _) _) ->
+                return $ unpack <$> keys deps
+              _ -> return []
+          Failure err -> error $ show err
 
       defaultNix overrides = unlines $
         [ "{ pkgs ? (import <nixpkgs> {})"
