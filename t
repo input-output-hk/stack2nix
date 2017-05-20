@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
 set -e
+set -o pipefail
+
+# TODO: avoid relying on changes to nixpkgs
+NIX_PATH=nixpkgs=$HOME/src/nixpkgs
 
 RED="\033[1;31m"
 YELLOW="\033[1;33m"
@@ -36,7 +40,7 @@ build_repo() {
 
     echo -e "${YELLOW}Running stack2nix on $repo${NC}"
     pushd "$work_dir"
-    stack2nix $rev $repo || (echo -e "${RED}FAIL: stack2nix: $description${NC}"; popd; exit 1)
+    stack2nix $rev $repo 2>&1 | tee "$HOME/tmp/s2n-${build_target}.log" || (echo -e "${RED}FAIL: stack2nix: $description${NC}"; popd; exit 1)
 
     echo -e "${YELLOW}Running nix-build on $build_target${NC}"
     nix-build -A $build_target --show-trace || (echo -e "${RED}FAIL: nix-build: $description${NC}"; popd; exit 1)
@@ -50,9 +54,15 @@ build_repo() {
 run_tests() {
     echo -e "${YELLOW}Running tests...${NC}"
 
-    build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
+    # build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
 
-    # build_repo "Remote cardano-sl" https://github.com/input-output-hk/cardano-sl.git cardano-sl be7cb65f71e7bd5b34778652009469c4513ecb79
+    # local clone_dir="$(mktemp -d)"
+    # git clone https://github.com/jmitchell/haskell-multi-package-demo1 "$clone_dir"
+    # build_repo "Local simple" "$clone_dir" haskell-multi-proj-demo1
+
+    # build_repo "Remote digest" https://github.com/jkff/digest digest
+
+    build_repo "Remote cardano-sl" https://github.com/input-output-hk/cardano-sl.git cardano-sl be7cb65f71e7bd5b34778652009469c4513ecb79
 }
 
 build_self && run_tests

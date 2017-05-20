@@ -21,7 +21,7 @@ cabal2nix uri commit subpath = do
     args = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , maybe [] (\d -> ["--subpath", d]) subpath
-      , ["--no-check"]          -- TODO: only use on repos that need it.
+      , ["--no-check", "--no-haddock"]          -- TODO: only use on repos that need it.
       , [uri]
       ]
 

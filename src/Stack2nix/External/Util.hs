@@ -12,7 +12,7 @@ runCmdFrom dir prog args = do
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
   case exitCode of
     ExitSuccess -> return $ Right stdout
-    _           -> return $ Left stderr
+    _           -> return $ Left $ "Command failed: " ++ cmd ++ "\n" ++ stderr
   where
     fromDir :: FilePath -> CreateProcess -> CreateProcess
     fromDir d procDesc = procDesc { cwd = Just d }
