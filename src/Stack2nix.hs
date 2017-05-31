@@ -10,6 +10,8 @@ module Stack2nix
   , stack2nix
   ) where
 
+import           Control.Concurrent.Async
+import           Control.Concurrent.MSem
 import           Control.Exception          (SomeException, catch)
 import qualified Data.ByteString            as BS
 import           Data.Fix                   (Fix (..))
@@ -19,6 +21,7 @@ import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                ((<>))
 import           Data.Text                  (Text, pack, unpack)
+import qualified Data.Traversable           as T
 import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
 import qualified Data.Yaml                  as Y
 import           Nix.Expr                   (Binding (..), NExpr, NExprF (..),
@@ -30,14 +33,16 @@ import           Stack2nix.External         (cabal2nix)
 import           Stack2nix.External.Util    (runCmdFrom)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
-import           System.Directory           (doesFileExist)
+import           System.Directory           (createDirectoryIfMissing,
+                                             doesFileExist)
 import           System.FilePath            (dropExtension, takeFileName, (</>))
 import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
-  { argRev :: Maybe String
-  , argUri :: String
+  { argRev    :: Maybe String
+  , argOutdir :: Maybe FilePath
+  , argUri    :: String
   }
   deriving (Show)
 
@@ -84,6 +89,7 @@ instance FromJSON RemotePkgConf where
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
 parseStackYaml = Y.decode
 
+-- TODO: expose as CLI option
 packageRenameMap :: Map.Map Text Text
 packageRenameMap =
   Map.fromList [ ("servant", "servant_0_10")
@@ -91,27 +97,26 @@ packageRenameMap =
                , ("servant-server", "servant-server_0_10")
                ]
 
--- TODO: Factor out pure parts.
 stack2nix :: Args -> IO ()
 stack2nix Args{..} = do
-  isLocalRepo <- doesFileExist (argUri </> "stack.yaml")
+  isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
   then handleStackConfig Nothing argUri
-  else withSystemTempDirectory "s2n-" (\tmpDir ->
-    tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir)
+  else withSystemTempDirectory "s2n-" $ \tmpDir ->
+    tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do
-      git (OutsideRepo (Clone argUri tmpDir))
+      git $ OutsideRepo $ Clone argUri tmpDir
       case argRev of
-        Just r  -> git (InsideRepo tmpDir (Checkout r))
+        Just r  -> git $ InsideRepo tmpDir $ Checkout r
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir =
       BS.readFile (localDir </> "stack.yaml") >>= \contents ->
       case parseStackYaml contents of
-        Just config -> toNix remoteUri localDir argRev config
+        Just config -> toNix remoteUri localDir argOutdir argRev config
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
 
 applyRenameMap :: Map.Map Text Text -> [FilePath] -> IO ()
@@ -133,35 +138,52 @@ applyRenameMap nameMap = traverse_ renamePkgs
     patch x = x
 
     patchParams :: Map.Map Text (Maybe r) -> Map.Map Text (Maybe r)
-    patchParams = Map.mapKeys (\k -> Map.findWithDefault k k nameMap)
+    patchParams = Map.mapKeys $ \k -> Map.findWithDefault k k nameMap
 
     patchArgs :: [Binding (Fix NExprF)] -> [Binding (Fix NExprF)]
-    patchArgs = fmap (\x ->
+    patchArgs = fmap $ \x ->
                         case x of
                           NamedVar k (Fix (NList names)) ->
                             NamedVar k (Fix (NList $ fmap (\y ->
                                                              case y of
                                                                Fix (NSym name) -> Fix . NSym $ Map.findWithDefault name name nameMap
                                                                _ -> y) names))
-                          _ -> x)
+                          _ -> x
 
-toNix :: Maybe String -> FilePath -> Maybe String -> StackConfig -> IO ()
-toNix remoteUri baseDir rev StackConfig{..} = do
-  traverse_ genNixFile packages
-  overrides <- mapM overrideFor =<< updateDeps
-  traverse_ genNixFile packages
-  applyRenameMap packageRenameMap =<< glob "*.nix"
-  writeFile "initialPackages.nix" $ initialPackages overrides
-  writeFile "default.nix" defaultNix
+-- Credit: https://stackoverflow.com/a/18898822/204305
+mapPool :: T.Traversable t => Int -> (a -> IO b) -> t a -> IO (t b)
+mapPool max' f xs = do
+  sem <- new max'
+  mapConcurrently (with sem . f) xs
+
+c2nPoolSize :: Int
+c2nPoolSize = 4
+
+toNix :: Maybe String -> FilePath -> Maybe FilePath -> Maybe String -> StackConfig -> IO ()
+toNix remoteUri baseDir outDir rev StackConfig{..} = do
+  putStrLn $ "Writing nix files to " ++ (dir ".")
+  createDirectoryIfMissing True (dir ".")
+  _ <- mapPool c2nPoolSize genNixFile packages
+  overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps
+  _ <- mapPool c2nPoolSize genNixFile packages
+  applyRenameMap packageRenameMap =<< glob (dir "*.nix")
+  writeFile (dir "initialPackages.nix") $ initialPackages overrides
+  writeFile (dir "default.nix") defaultNix
     where
+      dir fname = maybe fname (</> fname) outDir
+
       updateDeps :: IO [FilePath]
       updateDeps = do
         putStrLn $ "Updating deps from " ++ baseDir
-        result <- runCmdFrom baseDir "stack" ["list-dependencies", "--separator", "-", "--no-include-base", "--test", "--bench"]
+        result <- runCmdFrom baseDir "stack" ["list-dependencies", "--separator", "-"]
         case result of
-          Right pkgs -> mapM_ (\d -> catch (handleExtraDep d) ignoreError) $ pack <$> lines pkgs
-          Left _ -> error "FAILED: stack list-dependencies"
-        glob "*.nix"
+          Right pkgs -> do
+            putStrLn "Haskell dependencies:"
+            mapM_ putStrLn $ lines pkgs
+            _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep d) ignoreError) $ pack <$> lines pkgs
+            return ()
+          Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
+        glob (dir "*.nix")
 
       -- TODO: Remove this.
       ignoreError :: SomeException -> IO ()
@@ -169,13 +191,13 @@ toNix remoteUri baseDir rev StackConfig{..} = do
 
       genNixFile :: Package -> IO ()
       genNixFile (LocalPkg relPath) =
-        cabal2nix (fromMaybe baseDir remoteUri) (pack <$> rev) (Just relPath)
+        cabal2nix (fromMaybe baseDir remoteUri) (pack <$> rev) (Just relPath) outDir
       genNixFile (RemotePkg RemotePkgConf{..}) =
-        cabal2nix (unpack gitUrl) (Just commit) Nothing
+        cabal2nix (unpack gitUrl) (Just commit) Nothing outDir
 
       handleExtraDep :: Text -> IO ()
       handleExtraDep dep =
-        cabal2nix ("cabal://" <> unpack dep) Nothing Nothing
+        cabal2nix ("cabal://" <> unpack dep) Nothing Nothing outDir
 
       nameOf :: FilePath -> String
       nameOf fname =
@@ -237,10 +259,11 @@ toNix remoteUri baseDir rev StackConfig{..} = do
         , ""
         , "with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });"
         , ""
+        , "let"
+        , "  hackagePackages = import <nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix>;"
+        , "  stackPackages = import ./initialPackages.nix;"
+        , "in"
         , "compiler.override {"
-        , "  initialPackages = makePackageSet {"
-        , "    package-set = import ./initialPackages.nix;"
-        , "    inherit ghc;"
-        , "  };"
+        , "  initialPackages = (args: self: (hackagePackages args self) // (stackPackages args self));"
         , "}"
         ]

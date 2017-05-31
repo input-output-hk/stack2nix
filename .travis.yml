@@ -1,2 +1,2 @@
 language: nix
-script: nix-shell --command ./t
+script: nix-shell --run "stack test"

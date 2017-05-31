@@ -3,7 +3,6 @@
 set -e
 set -o pipefail
 
-# TODO: avoid relying on changes to nixpkgs
 NIX_PATH=nixpkgs=$HOME/src/nixpkgs
 
 RED="\033[1;31m"
@@ -54,7 +53,7 @@ build_repo() {
 run_tests() {
     echo -e "${YELLOW}Running tests...${NC}"
 
-    # build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
+    build_repo "Remote simple" https://github.com/jmitchell/haskell-multi-package-demo1 haskell-multi-proj-demo1
 
     # local clone_dir="$(mktemp -d)"
     # git clone https://github.com/jmitchell/haskell-multi-package-demo1 "$clone_dir"

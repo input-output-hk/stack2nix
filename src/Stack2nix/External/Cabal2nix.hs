@@ -3,24 +3,31 @@ module Stack2nix.External.Cabal2nix (
   ) where
 
 import           Data.List               (stripPrefix, takeWhile)
+import           Data.Maybe              (fromMaybe)
 import           Data.Monoid             ((<>))
 import           Data.Text               (Text, unpack)
 import           Stack2nix.External.Util (runCmd)
+import           System.FilePath         ((</>))
 
 -- Requires cabal2nix >= 2.2 in PATH
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> IO ()
-cabal2nix uri commit subpath = do
-  result <- runCmd exe args
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO ()
+cabal2nix uri commit subpath odir = do
+  result <- runCmd exe (args $ fromMaybe "." subpath)
   case result of
-    Right stdout -> writeFile (pname stdout <> ".nix") stdout
+    Right stdout ->
+      let basename = pname stdout <> ".nix"
+          fname = maybe basename (</> basename) odir
+      in
+      writeFile fname stdout
     Left stderr  -> error stderr
   where
     exe = "cabal2nix"
 
-    args :: [String]
-    args = concat
+    args :: FilePath -> [String]
+    args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
-      , maybe [] (\d -> ["--subpath", d]) subpath
+      -- , maybe [] (\d -> ["--subpath", d]) subpath
+      , ["--subpath", dir]
       , ["--no-check", "--no-haddock"]          -- TODO: only use on repos that need it.
       , [uri]
       ]
