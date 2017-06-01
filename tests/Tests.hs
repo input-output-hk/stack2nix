@@ -71,7 +71,7 @@ programTests = testGroup "executable exit code tests"
 
 goldenTests :: TestTree
 goldenTests = testGroup "executable output tests"
-  [ nixFile "https://github.com/jmitchell/haskell-dummy-project1.git" "7e7d91d86ba0f86633ab37279c013879ade09e32" "haskell-dummy-package1" "initialPackages.nix"
+  [ nixFile "https://github.com/jmitchell/haskell-dummy-project1.git" "7e7d91d86ba0f86633ab37279c013879ade09e32" "haskell-dummy-package1" "default.nix"
   , nixFile "https://github.com/jmitchell/haskell-multi-package-demo1.git" "e3d9bd6d6066dab5222ce53fb7d234f28eafa2d5" "haskell-multi-proj-demo1" "default.nix"
   , nixFile "https://github.com/input-output-hk/cardano-sl.git" "be7cb65f71e7bd5b34778652009469c4513ecb79" "cardano-sl" "default.nix"
   ]

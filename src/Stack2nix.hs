@@ -17,7 +17,7 @@ import           Control.Monad              (unless)
 import qualified Data.ByteString            as BS
 import           Data.Fix                   (Fix (..))
 import           Data.Foldable              (traverse_)
-import           Data.List                  (foldl')
+import           Data.List                  (foldl', sort)
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                ((<>))
@@ -173,10 +173,12 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
   overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps
   _ <- mapPool c2nPoolSize genNixFile packages
   applyRenameMap packageRenameMap =<< glob (dir "*.nix")
-  writeFile (dir "initialPackages.nix") $ initialPackages overrides
+  writeFile (dir "initialPackages.nix") $ initialPackages $ sort overrides
   pullInNixFiles $ dir "initialPackages.nix"
-  writeFile (dir "default.nix") defaultNix
-  -- pullInNixFiles $ dir "default.nix"
+  nf <- parseNixFile $ dir "initialPackages.nix"
+  case nf of
+    Success expr -> writeFile (dir "default.nix") $ defaultNix expr
+    _ -> error "failed to parse intermediary initialPackages.nix file"
     where
       dir fname = maybe fname (</> fname) outDir
 
@@ -235,7 +237,7 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
                 let expr' = Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs')))))
                 writeFile nixFile $ (++ "\n") $ show $ prettyNix expr'
               _ ->
-                error $ "unhandled nix expression format\n" ++ show (prettyNix expr)
+                error $ "unhandled nix expression format\n" ++ show expr
           _ -> error "failed to parse nix file!"
           where
             patchAttr :: Binding (Fix NExprF) -> IO (Binding (Fix NExprF))
@@ -289,7 +291,7 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
         [ "}"
         ]
 
-      defaultNix = unlines
+      defaultNix pkgsNixExpr = unlines
         [ "{ pkgs ? (import <nixpkgs> {})"
         , ", compiler ? pkgs.haskell.packages.ghc802"
         , ", ghc ? pkgs.haskell.compiler.ghc802"
@@ -299,7 +301,7 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
         , ""
         , "let"
         , "  hackagePackages = import <nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix>;"
-        , "  stackPackages = import ./initialPackages.nix;"
+        , "  stackPackages = " ++ show (prettyNix pkgsNixExpr) ++ ";"
         , "in"
         , "compiler.override {"
         , "  initialPackages = (args: self: (hackagePackages args self) // (stackPackages args self));"
