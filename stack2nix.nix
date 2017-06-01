@@ -27,6 +27,8 @@ mkDerivation {
     cabal-install
     which
   ];
+  doHaddock = false;
+  doCheck = false;
   description = "Convert stack.yaml files into Nix build instructions.";
   license = stdenv.lib.licenses.bsd3;
 }
