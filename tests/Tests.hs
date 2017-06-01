@@ -87,6 +87,7 @@ goldenTests = testGroup "executable output tests"
         -- TODO: replace /tmp with portable solution
         outDir = "/tmp" </> nickname
         actualFile = outDir </> nixFname
+        diffCmd = \ref new -> ["diff", "-u", ref, new]
         task = do
           setEnv "NIX_PATH" nixPath
           createDirectoryIfMissing True $ takeDirectory goldFile
@@ -96,4 +97,4 @@ goldenTests = testGroup "executable output tests"
             then readCreateProcess (proc "nix-build" ["-A", targetAttr]){ cwd = Just outDir } "" >> return ()
             else return ()
       in
-        goldenVsFile description goldFile actualFile task
+        goldenVsFileDiff description diffCmd goldFile actualFile task
