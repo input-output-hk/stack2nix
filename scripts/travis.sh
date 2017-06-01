@@ -9,7 +9,7 @@ git clone https://github.com/NixOS/cabal2nix "$CABAL2NIX_DIR"
 pushd "$CABAL2NIX_DIR"
 git checkout b6834fd420e0223d0d57f8f98caeeb6ac088be88
 PATH="$HOME/.local/bin:$PATH"
-stack init
+stack --install-ghc init
 stack build
 stack install
 popd
