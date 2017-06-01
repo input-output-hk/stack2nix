@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 # install stack
 nix-env -i stack
 sudo apt-get install -y libgmp-dev
