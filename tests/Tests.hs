@@ -7,7 +7,8 @@ import           Test.Tasty.Program
 
 import qualified Data.ByteString       as BS
 import qualified Data.ByteString.Char8 as BSC
-import           System.Directory      (createDirectoryIfMissing)
+import           System.Directory      (createDirectoryIfMissing,
+                                        removeDirectoryRecursive)
 import           System.Environment    (setEnv)
 import           System.FilePath       (takeDirectory, takeFileName, (<.>),
                                         (</>))
@@ -88,7 +89,8 @@ goldenTests = testGroup "executable output tests"
         task = do
           setEnv "NIX_PATH" nixPath
           createDirectoryIfMissing True $ takeDirectory goldFile
-          readCreateProcess (proc "stack2nix" ["--outdir", outDir, "--revision", rev, proj]) "" >> return ()
+          removeDirectoryRecursive outDir
+          readCreateProcess (proc "stack2nix" ["--outdir", outDir, "--revision", rev, proj]) "" >>= putStrLn
           if shouldVerifyBuild
             then readCreateProcess (proc "nix-build" ["-A", targetAttr]){ cwd = Just outDir } "" >> return ()
             else return ()

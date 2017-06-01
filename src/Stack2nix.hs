@@ -36,7 +36,9 @@ import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           System.Directory           (createDirectoryIfMissing,
                                              doesFileExist)
-import           System.FilePath            (dropExtension, takeFileName, (</>))
+import           System.FilePath            (dropExtension, isAbsolute,
+                                             normalise, takeDirectory,
+                                             takeFileName, (</>))
 import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
@@ -172,7 +174,9 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
   _ <- mapPool c2nPoolSize genNixFile packages
   applyRenameMap packageRenameMap =<< glob (dir "*.nix")
   writeFile (dir "initialPackages.nix") $ initialPackages overrides
+  pullInNixFiles $ dir "initialPackages.nix"
   writeFile (dir "default.nix") defaultNix
+  -- pullInNixFiles $ dir "default.nix"
     where
       dir fname = maybe fname (</> fname) outDir
 
@@ -219,6 +223,36 @@ toNix remoteUri baseDir outDir rev StackConfig{..} = do
           externalDeps = do
             deps <- librarySystemDeps nixFile
             return . unwords $ fmap (\d -> d <> " = pkgs." <> d <> ";") deps
+
+      pullInNixFiles :: FilePath -> IO ()
+      pullInNixFiles nixFile = do
+        nf <- parseNixFile nixFile
+        case nf of
+          Success expr ->
+            case expr of
+              Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs))))) -> do
+                attrs' <- mapM patchAttr attrs
+                let expr' = Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs')))))
+                writeFile nixFile $ (++ "\n") $ show $ prettyNix expr'
+              _ ->
+                error $ "unhandled nix expression format\n" ++ show (prettyNix expr)
+          _ -> error "failed to parse nix file!"
+          where
+            patchAttr :: Binding (Fix NExprF) -> IO (Binding (Fix NExprF))
+            patchAttr attr =
+              case attr of
+                NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg)) deps)) -> do
+                  pkg' <- patchPkgRef pkg
+                  return $ NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg')) deps))
+                _ -> error $ "unhandled NamedVar"
+
+            patchPkgRef (Fix (NLiteralPath path)) = do
+              let p = if isAbsolute path then path else normalise $ takeDirectory nixFile </> path
+              nf <- parseNixFile p
+              case nf of
+                Success expr -> return expr
+                _ -> error $ "failed to parse referenced nix file '" ++ path ++ "'"
+            patchPkgRef x                   = return x
 
       librarySystemDeps :: FilePath -> IO [String]
       librarySystemDeps nixFile = do
