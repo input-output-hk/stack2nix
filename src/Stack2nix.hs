@@ -13,6 +13,7 @@ module Stack2nix
 import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
 import           Control.Exception          (SomeException, catch)
+import           Control.Monad              (unless)
 import qualified Data.ByteString            as BS
 import           Data.Fix                   (Fix (..))
 import           Data.Foldable              (traverse_)
@@ -113,8 +114,11 @@ stack2nix Args{..} = do
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
-    handleStackConfig remoteUri localDir =
-      BS.readFile (localDir </> "stack.yaml") >>= \contents ->
+    handleStackConfig remoteUri localDir = do
+      let fname = localDir </> "stack.yaml"
+      alreadyExists <- doesFileExist fname
+      unless alreadyExists $ runCmdFrom localDir "stack" ["init"] >> return ()
+      contents <- BS.readFile fname
       case parseStackYaml contents of
         Just config -> toNix remoteUri localDir argOutdir argRev config
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
