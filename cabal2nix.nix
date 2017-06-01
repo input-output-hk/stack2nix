@@ -32,6 +32,8 @@ mkDerivation {
     language-nix lens optparse-applicative pretty process SHA split
     text transformers yaml
   ];
+  doHaddock = false;
+  doCheck = false;
   homepage = "https://github.com/nixos/cabal2nix#readme";
   description = "Convert Cabal files into Nix build instructions";
   license = stdenv.lib.licenses.bsd3;
