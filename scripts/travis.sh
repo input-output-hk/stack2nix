@@ -2,9 +2,8 @@
 
 set -ex
 
-# install stack
-nix-env -i stack
-sudo apt-get install -y libgmp-dev
+# install dependencies from nix
+nix-env -i stack nix-prefetch-git git
 
 # install cabal2nix 2.2.1
 CABAL2NIX_DIR=$(mktemp -d)
