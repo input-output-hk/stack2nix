@@ -2,6 +2,7 @@
 
 # install stack
 nix-env -i stack
+apt-get install -y libgmp-dev
 
 # install cabal2nix 2.2.1
 CABAL2NIX_DIR=$(mktemp -d)
