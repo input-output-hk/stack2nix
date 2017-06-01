@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# install stack
+nix-env -i stack
+
 # install cabal2nix 2.2.1
 CABAL2NIX_DIR=$(mktemp -d)
 git clone https://github.com/NixOS/cabal2nix "$CABAL2NIX_DIR"
