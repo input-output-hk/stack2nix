@@ -1,2 +1,2 @@
 language: nix
-script: nix-shell --run "stack test"
+script: ./scripts/travis.sh
