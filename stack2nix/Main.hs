@@ -7,7 +7,7 @@ import           Stack2nix
 args :: Parser Args
 args = Args
        <$> optional (strOption $ long "revision" <> help "revision to use when fetching from VCS")
-       <*> optional (strOption $ long "outdir" <> help "output directory for generated nix expressions")
+       <*> optional (strOption $ short 'o' <> help "output file for generated nix expression")
        <*> strArgument (metavar "URI")
 
 main :: IO ()
@@ -15,4 +15,4 @@ main = stack2nix =<< execParser opts
   where
     opts = info (args <**> helper) $
       fullDesc
-      <> progDesc "this is a progDesc"
+      <> progDesc "Generate a nix expression for a Haskell package using stack"

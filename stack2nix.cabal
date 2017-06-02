@@ -62,5 +62,4 @@ test-suite tests
                      , tasty
                      , tasty-hunit
                      , tasty-program
-                     , temporary
   default-language:    Haskell2010

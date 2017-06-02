@@ -43,9 +43,9 @@ import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
-  { argRev    :: Maybe String
-  , argOutdir :: Maybe FilePath
-  , argUri    :: String
+  { argRev     :: Maybe String
+  , argOutFile :: Maybe FilePath
+  , argUri     :: String
   }
   deriving (Show)
 
@@ -122,7 +122,7 @@ stack2nix Args{..} = do
       unless alreadyExists $ runCmdFrom localDir "stack" ["init"] >> return ()
       contents <- BS.readFile fname
       case parseStackYaml contents of
-        Just config -> toNix remoteUri localDir argOutdir argRev config
+        Just config -> toNix remoteUri localDir argOutFile argRev config
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
 
 applyRenameMap :: Map.Map Text Text -> [FilePath] -> IO ()
@@ -166,144 +166,144 @@ c2nPoolSize :: Int
 c2nPoolSize = 4
 
 toNix :: Maybe String -> FilePath -> Maybe FilePath -> Maybe String -> StackConfig -> IO ()
-toNix remoteUri baseDir outDir rev StackConfig{..} = do
-  putStrLn $ "Writing nix files to " ++ (dir ".")
-  createDirectoryIfMissing True (dir ".")
-  _ <- mapPool c2nPoolSize genNixFile packages
-  overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps
-  _ <- mapPool c2nPoolSize genNixFile packages
-  applyRenameMap packageRenameMap =<< glob (dir "*.nix")
-  writeFile (dir "initialPackages.nix") $ initialPackages $ sort overrides
-  pullInNixFiles $ dir "initialPackages.nix"
-  nf <- parseNixFile $ dir "initialPackages.nix"
-  case nf of
-    Success expr -> writeFile (dir "default.nix") $ defaultNix expr
-    _ -> error "failed to parse intermediary initialPackages.nix file"
-    where
-      dir fname = maybe fname (</> fname) outDir
+toNix remoteUri baseDir outFile rev StackConfig{..} =
+  withSystemTempDirectory "s2n" $ \outDir -> do
+    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
+    overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
+    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
+    applyRenameMap packageRenameMap =<< glob (outDir </> "*.nix")
+    writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
+    pullInNixFiles $ outDir </> "initialPackages.nix"
+    nf <- parseNixFile $ outDir </> "initialPackages.nix"
+    case nf of
+      Success expr ->
+        case outFile of
+          Just fname -> writeFile fname $ defaultNix expr
+          Nothing    -> putStrLn $ defaultNix expr
+      _ -> error "failed to parse intermediary initialPackages.nix file"
+      where
+        updateDeps :: FilePath -> IO [FilePath]
+        updateDeps outDir = do
+          putStrLn $ "Updating deps from " ++ baseDir
+          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--separator", "-"]
+          case result of
+            Right pkgs -> do
+              putStrLn "Haskell dependencies:"
+              mapM_ putStrLn $ lines pkgs
+              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> lines pkgs
+              return ()
+            Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
+          glob (outDir </> "*.nix")
 
-      updateDeps :: IO [FilePath]
-      updateDeps = do
-        putStrLn $ "Updating deps from " ++ baseDir
-        result <- runCmdFrom baseDir "stack" ["list-dependencies", "--separator", "-"]
-        case result of
-          Right pkgs -> do
-            putStrLn "Haskell dependencies:"
-            mapM_ putStrLn $ lines pkgs
-            _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep d) ignoreError) $ pack <$> lines pkgs
-            return ()
-          Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
-        glob (dir "*.nix")
+        -- TODO: Remove this.
+        ignoreError :: SomeException -> IO ()
+        ignoreError _ = return ()
 
-      -- TODO: Remove this.
-      ignoreError :: SomeException -> IO ()
-      ignoreError _ = return ()
+        genNixFile :: FilePath -> Package -> IO ()
+        genNixFile outDir (LocalPkg relPath) =
+          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> rev) (Just relPath) (Just outDir)
+        genNixFile outDir (RemotePkg RemotePkgConf{..}) =
+          cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir)
 
-      genNixFile :: Package -> IO ()
-      genNixFile (LocalPkg relPath) =
-        cabal2nix (fromMaybe baseDir remoteUri) (pack <$> rev) (Just relPath) outDir
-      genNixFile (RemotePkg RemotePkgConf{..}) =
-        cabal2nix (unpack gitUrl) (Just commit) Nothing outDir
+        handleExtraDep :: FilePath -> Text -> IO ()
+        handleExtraDep outDir dep =
+          cabal2nix ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
 
-      handleExtraDep :: Text -> IO ()
-      handleExtraDep dep =
-        cabal2nix ("cabal://" <> unpack dep) Nothing Nothing outDir
+        nameOf :: FilePath -> String
+        nameOf fname =
+          let defaultName = pack $ dropExtension . takeFileName $ fname
+          in
+            unpack $ Map.findWithDefault defaultName defaultName packageRenameMap
 
-      nameOf :: FilePath -> String
-      nameOf fname =
-        let defaultName = pack $ dropExtension . takeFileName $ fname
-        in
-          unpack $ Map.findWithDefault defaultName defaultName packageRenameMap
-
-      overrideFor :: FilePath -> IO String
-      overrideFor nixFile = do
-        putStrLn $ "Generating override for " <> nixFile
-        deps <- externalDeps
-        return $ "    " <> nameOf nixFile <> " = callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
-        where
-          externalDeps :: IO String
-          externalDeps = do
-            deps <- librarySystemDeps nixFile
-            return . unwords $ fmap (\d -> d <> " = pkgs." <> d <> ";") deps
-
-      pullInNixFiles :: FilePath -> IO ()
-      pullInNixFiles nixFile = do
-        nf <- parseNixFile nixFile
-        case nf of
-          Success expr ->
-            case expr of
-              Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs))))) -> do
-                attrs' <- mapM patchAttr attrs
-                let expr' = Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs')))))
-                writeFile nixFile $ (++ "\n") $ show $ prettyNix expr'
-              _ ->
-                error $ "unhandled nix expression format\n" ++ show expr
-          _ -> error "failed to parse nix file!"
+        overrideFor :: FilePath -> IO String
+        overrideFor nixFile = do
+          putStrLn $ "Generating override for " <> nixFile
+          deps <- externalDeps
+          return $ "    " <> nameOf nixFile <> " = callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
           where
-            patchAttr :: Binding (Fix NExprF) -> IO (Binding (Fix NExprF))
-            patchAttr attr =
-              case attr of
-                NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg)) deps)) -> do
-                  pkg' <- patchPkgRef pkg
-                  return $ NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg')) deps))
-                _ -> error $ "unhandled NamedVar"
+            externalDeps :: IO String
+            externalDeps = do
+              deps <- librarySystemDeps nixFile
+              return . unwords $ fmap (\d -> d <> " = pkgs." <> d <> ";") deps
 
-            patchPkgRef (Fix (NLiteralPath path)) = do
-              let p = if isAbsolute path then path else normalise $ takeDirectory nixFile </> path
-              nf <- parseNixFile p
-              case nf of
-                Success expr -> return expr
-                _ -> error $ "failed to parse referenced nix file '" ++ path ++ "'"
-            patchPkgRef x                   = return x
+        pullInNixFiles :: FilePath -> IO ()
+        pullInNixFiles nixFile = do
+          nf <- parseNixFile nixFile
+          case nf of
+            Success expr ->
+              case expr of
+                Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs))))) -> do
+                  attrs' <- mapM patchAttr attrs
+                  let expr' = Fix (NAbs paramSet (Fix (NAbs fnParam (Fix (NSet attrs')))))
+                  writeFile nixFile $ (++ "\n") $ show $ prettyNix expr'
+                _ ->
+                  error $ "unhandled nix expression format\n" ++ show expr
+            _ -> error "failed to parse nix file!"
+            where
+              patchAttr :: Binding (Fix NExprF) -> IO (Binding (Fix NExprF))
+              patchAttr attr =
+                case attr of
+                  NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg)) deps)) -> do
+                    pkg' <- patchPkgRef pkg
+                    return $ NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg')) deps))
+                  _ -> error $ "unhandled NamedVar"
 
-      librarySystemDeps :: FilePath -> IO [String]
-      librarySystemDeps nixFile = do
-        nf <- parseNixFile nixFile
-        case nf of
-          Success expr ->
-            case expr of
-              Fix (NAbs _ (Fix (NApp _ (Fix (NSet namedVars))))) ->
-                case lookupNamedVar namedVars "librarySystemDepends" of
-                  Just (Fix (NList deps)) ->
-                    return $ foldl' (\acc x ->
-                                       case x of
-                                         Fix (NSym name) -> unpack name : acc
-                                         _               -> acc) [] deps
-                  _ -> return []
-              _ -> return []
-          _ -> return []
+              patchPkgRef (Fix (NLiteralPath path)) = do
+                let p = if isAbsolute path then path else normalise $ takeDirectory nixFile </> path
+                nf <- parseNixFile p
+                case nf of
+                  Success expr -> return expr
+                  _ -> error $ "failed to parse referenced nix file '" ++ path ++ "'"
+              patchPkgRef x                   = return x
 
-      lookupNamedVar :: [Binding a] -> String -> Maybe a
-      lookupNamedVar [] _ = Nothing
-      lookupNamedVar (x:xs) name =
-        case x of
-          NamedVar [StaticKey k] val ->
-            if unpack k == name
-            then Just val
-            else lookupNamedVar xs name
-          _ -> lookupNamedVar xs name
+        librarySystemDeps :: FilePath -> IO [String]
+        librarySystemDeps nixFile = do
+          nf <- parseNixFile nixFile
+          case nf of
+            Success expr ->
+              case expr of
+                Fix (NAbs _ (Fix (NApp _ (Fix (NSet namedVars))))) ->
+                  case lookupNamedVar namedVars "librarySystemDepends" of
+                    Just (Fix (NList deps)) ->
+                      return $ foldl' (\acc x ->
+                                         case x of
+                                           Fix (NSym name) -> unpack name : acc
+                                           _               -> acc) [] deps
+                    _ -> return []
+                _ -> return []
+            _ -> return []
 
-      initialPackages overrides = unlines $
-        [ "{ pkgs, stdenv, callPackage }:"
-        , ""
-        , "self: {"
-        ] ++ overrides ++
-        [ "}"
-        ]
+        lookupNamedVar :: [Binding a] -> String -> Maybe a
+        lookupNamedVar [] _ = Nothing
+        lookupNamedVar (x:xs) name =
+          case x of
+            NamedVar [StaticKey k] val ->
+              if unpack k == name
+              then Just val
+              else lookupNamedVar xs name
+            _ -> lookupNamedVar xs name
 
-      defaultNix pkgsNixExpr = unlines
-        [ "{ pkgs ? (import <nixpkgs> {})"
-        , ", compiler ? pkgs.haskell.packages.ghc802"
-        , ", ghc ? pkgs.haskell.compiler.ghc802"
-        , "}:"
-        , ""
-        , "with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });"
-        , ""
-        , "let"
-        , "  hackagePackages = import <nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix>;"
-        , "  stackPackages = " ++ show (prettyNix pkgsNixExpr) ++ ";"
-        , "in"
-        , "compiler.override {"
-        , "  initialPackages = (args: self: (hackagePackages args self) // (stackPackages args self));"
-        , "}"
-        ]
+        initialPackages overrides = unlines $
+          [ "{ pkgs, stdenv, callPackage }:"
+          , ""
+          , "self: {"
+          ] ++ overrides ++
+          [ "}"
+          ]
+
+        defaultNix pkgsNixExpr = unlines
+          [ "{ pkgs ? (import <nixpkgs> {})"
+          , ", compiler ? pkgs.haskell.packages.ghc802"
+          , ", ghc ? pkgs.haskell.compiler.ghc802"
+          , "}:"
+          , ""
+          , "with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });"
+          , ""
+          , "let"
+          , "  hackagePackages = import <nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix>;"
+          , "  stackPackages = " ++ show (prettyNix pkgsNixExpr) ++ ";"
+          , "in"
+          , "compiler.override {"
+          , "  initialPackages = (args: self: (hackagePackages args self) // (stackPackages args self));"
+          , "}"
+          ]

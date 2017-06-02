@@ -7,8 +7,7 @@ import           Test.Tasty.Program
 import qualified Data.ByteString       as BS
 import qualified Data.ByteString.Char8 as BSC
 import           System.Environment    (setEnv)
-import           System.FilePath       (takeFileName)
-import           System.IO.Temp        (withSystemTempDirectory)
+import           System.FilePath       (takeDirectory, takeFileName)
 import           System.Process
 
 import           Stack2nix
@@ -70,17 +69,17 @@ programTests = testGroup "executable exit code tests"
 
 nixExpressionTests :: TestTree
 nixExpressionTests = testGroup "nix output tests"
-  [ nixFile "https://github.com/jmitchell/haskell-dummy-project1.git" "7e7d91d86ba0f86633ab37279c013879ade09e32" "haskell-dummy-package1" "default.nix"
-  , nixFile "https://github.com/jmitchell/haskell-multi-package-demo1.git" "e3d9bd6d6066dab5222ce53fb7d234f28eafa2d5" "haskell-multi-proj-demo1" "default.nix"
-  -- , nixFile "https://github.com/input-output-hk/cardano-sl.git" "be7cb65f71e7bd5b34778652009469c4513ecb79" "cardano-sl" "default.nix"
+  [ nixFile "https://github.com/jmitchell/haskell-dummy-project1.git" "7e7d91d86ba0f86633ab37279c013879ade09e32" "haskell-dummy-package1"
+  , nixFile "https://github.com/jmitchell/haskell-multi-package-demo1.git" "e3d9bd6d6066dab5222ce53fb7d234f28eafa2d5" "haskell-multi-proj-demo1"
+  -- , nixFile "https://github.com/input-output-hk/cardano-sl.git" "be7cb65f71e7bd5b34778652009469c4513ecb79" "cardano-sl"
   ]
   where
-    nixFile proj rev targetAttr nixFname =
-      testCaseSteps ("generates usable " ++ nixFname ++ " for " ++ takeFileName proj) $ \step ->
-        withSystemTempDirectory "s2n-tests" $ \outDir -> do
-          step "Running stack2nix to generate nix expression"
-          setEnv "NIX_PATH" nixPath
-          readCreateProcess (proc "stack2nix" ["--outdir", outDir, "--revision", rev, proj]) "" >>= putStrLn
+    nixFile proj rev targetAttr =
+      let nixFname = "output.nix" in
+      testCaseSteps ("generates usable " ++ nixFname ++ " for " ++ takeFileName proj) $ \step -> do
+        step "Running stack2nix to generate nix expression"
+        setEnv "NIX_PATH" nixPath
+        readCreateProcess (proc "stack2nix" ["-o", nixFname, "--revision", rev, proj]) "" >>= putStrLn
 
-          step "Verifying generated nix expression builds"
-          readCreateProcess (proc "nix-build" ["-A", targetAttr]){ cwd = Just outDir } "" >> return ()
+        step "Verifying generated nix expression builds"
+        readCreateProcess (proc "nix-build" ["-A", targetAttr, takeFileName nixFname]){ cwd = Just $ takeDirectory nixFname } "" >> return ()
