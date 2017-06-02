@@ -43,9 +43,10 @@ import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
-  { argRev     :: Maybe String
-  , argOutFile :: Maybe FilePath
-  , argUri     :: String
+  { argRev       :: Maybe String
+  , argOutFile   :: Maybe FilePath
+  , argSystemGHC :: Bool
+  , argUri       :: String
   }
   deriving (Show)
 
@@ -100,8 +101,12 @@ packageRenameMap =
                , ("servant-server", "servant-server_0_10")
                ]
 
+stackConfigOpts :: Args -> [String]
+stackConfigOpts args =
+  [ "--system-ghc" | argSystemGHC args ]
+
 stack2nix :: Args -> IO ()
-stack2nix Args{..} = do
+stack2nix args@Args{..} = do
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
   then handleStackConfig Nothing argUri
@@ -119,10 +124,11 @@ stack2nix Args{..} = do
     handleStackConfig remoteUri localDir = do
       let fname = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist fname
-      unless alreadyExists $ runCmdFrom localDir "stack" ["init"] >> return ()
+      unless alreadyExists $ runCmdFrom localDir "stack" (["init"] ++ stackConfigOpts args)
+                             >> return ()
       contents <- BS.readFile fname
       case parseStackYaml contents of
-        Just config -> toNix remoteUri localDir argOutFile argRev config
+        Just config -> toNix args remoteUri localDir config
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
 
 applyRenameMap :: Map.Map Text Text -> [FilePath] -> IO ()
@@ -165,8 +171,8 @@ mapPool max' f xs = do
 c2nPoolSize :: Int
 c2nPoolSize = 4
 
-toNix :: Maybe String -> FilePath -> Maybe FilePath -> Maybe String -> StackConfig -> IO ()
-toNix remoteUri baseDir outFile rev StackConfig{..} =
+toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
+toNix args@Args{..} remoteUri baseDir StackConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
     _ <- mapPool c2nPoolSize (genNixFile outDir) packages
     overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
@@ -177,7 +183,7 @@ toNix remoteUri baseDir outFile rev StackConfig{..} =
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
     case nf of
       Success expr ->
-        case outFile of
+        case argOutFile of
           Just fname -> writeFile fname $ defaultNix expr
           Nothing    -> putStrLn $ defaultNix expr
       _ -> error "failed to parse intermediary initialPackages.nix file"
@@ -185,7 +191,8 @@ toNix remoteUri baseDir outFile rev StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           putStrLn $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--separator", "-"]
+          result <- runCmdFrom baseDir "stack" (["list-dependencies", "--separator", "-"]
+                                                ++ stackConfigOpts args)
           case result of
             Right pkgs -> do
               putStrLn "Haskell dependencies:"
@@ -201,7 +208,7 @@ toNix remoteUri baseDir outFile rev StackConfig{..} =
 
         genNixFile :: FilePath -> Package -> IO ()
         genNixFile outDir (LocalPkg relPath) =
-          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> rev) (Just relPath) (Just outDir)
+          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
         genNixFile outDir (RemotePkg RemotePkgConf{..}) =
           cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir)
 
