@@ -9,6 +9,7 @@ recommended way.
 2. Clone this repo.
 3. Run `./scripts/travis.sh` to build and test.
 4. Run `stack install` to install.
+5. Ensure `cabal2nix` version 2.2.1 is in your PATH.
 
 ## Usage
 
