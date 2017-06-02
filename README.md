@@ -7,7 +7,8 @@ recommended way.
 
 1. Install [nix](https://nixos.org/nix/).
 2. Clone this repo.
-3. Run `nix-shell --command "stack2nix [args]"`
+3. Run `./scripts/travis.sh` to build and test.
+4. Run `stack install` to install.
 
 ## Usage
 
