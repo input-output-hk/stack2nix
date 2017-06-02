@@ -1,3 +1,6 @@
 language: nix
 sudo: required
+cache:
+  directories:
+    - /nix/store
 script: ./scripts/travis.sh
