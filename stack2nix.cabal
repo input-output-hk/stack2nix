@@ -60,7 +60,7 @@ test-suite tests
                      , filepath
                      , process
                      , tasty
-                     , tasty-golden
                      , tasty-hunit
                      , tasty-program
+                     , temporary
   default-language:    Haskell2010
