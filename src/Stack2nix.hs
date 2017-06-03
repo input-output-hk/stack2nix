@@ -34,8 +34,7 @@ import           Stack2nix.External         (cabal2nix)
 import           Stack2nix.External.Util    (runCmdFrom)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
-import           System.Directory           (createDirectoryIfMissing,
-                                             doesFileExist)
+import           System.Directory           (doesFileExist)
 import           System.FilePath            (dropExtension, isAbsolute,
                                              normalise, takeDirectory,
                                              takeFileName, (</>))
