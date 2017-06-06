@@ -42,10 +42,9 @@ import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
-  { argRev       :: Maybe String
-  , argOutFile   :: Maybe FilePath
-  , argSystemGHC :: Bool
-  , argUri       :: String
+  { argRev     :: Maybe String
+  , argOutFile :: Maybe FilePath
+  , argUri     :: String
   }
   deriving (Show)
 
@@ -100,10 +99,6 @@ packageRenameMap =
                , ("servant-server", "servant-server_0_10")
                ]
 
-stackConfigOpts :: Args -> [String]
-stackConfigOpts args =
-  [ "--system-ghc" | argSystemGHC args ]
-
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
@@ -123,7 +118,7 @@ stack2nix args@Args{..} = do
     handleStackConfig remoteUri localDir = do
       let fname = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist fname
-      unless alreadyExists $ runCmdFrom localDir "stack" (["init"] ++ stackConfigOpts args)
+      unless alreadyExists $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
                              >> return ()
       contents <- BS.readFile fname
       case parseStackYaml contents of
@@ -190,8 +185,7 @@ toNix args@Args{..} remoteUri baseDir StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           putStrLn $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" (["list-dependencies", "--separator", "-"]
-                                                ++ stackConfigOpts args)
+          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
           case result of
             Right pkgs -> do
               putStrLn "Haskell dependencies:"
