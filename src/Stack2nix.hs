@@ -35,6 +35,7 @@ import           Stack2nix.External.Util    (runCmdFrom)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           System.Directory           (doesFileExist)
+import           System.Environment         (getEnv)
 import           System.FilePath            (dropExtension, isAbsolute,
                                              normalise, takeDirectory,
                                              takeFileName, (</>))
@@ -102,6 +103,8 @@ packageRenameMap =
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
+  home <- getEnv "HOME"
+  runCmdFrom home "cabal" ["update"] >> return ()
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
   then handleStackConfig Nothing argUri
