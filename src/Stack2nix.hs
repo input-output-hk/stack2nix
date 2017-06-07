@@ -35,10 +35,12 @@ import           Stack2nix.External.Util    (runCmdFrom)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           System.Directory           (doesFileExist)
+import           System.Environment         (getEnv)
 import           System.FilePath            (dropExtension, isAbsolute,
                                              normalise, takeDirectory,
                                              takeFileName, (</>))
 import           System.FilePath.Glob       (glob)
+import           System.IO                  (hPutStrLn, stderr, stdout)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 data Args = Args
@@ -101,6 +103,8 @@ packageRenameMap =
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
+  home <- getEnv "HOME"
+  runCmdFrom home "cabal" ["update"] >> return ()
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
   then handleStackConfig Nothing argUri
@@ -166,7 +170,7 @@ c2nPoolSize :: Int
 c2nPoolSize = 4
 
 toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
-toNix args@Args{..} remoteUri baseDir StackConfig{..} =
+toNix Args{..} remoteUri baseDir StackConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
     _ <- mapPool c2nPoolSize (genNixFile outDir) packages
     overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
@@ -179,17 +183,17 @@ toNix args@Args{..} remoteUri baseDir StackConfig{..} =
       Success expr ->
         case argOutFile of
           Just fname -> writeFile fname $ defaultNix expr
-          Nothing    -> putStrLn $ defaultNix expr
+          Nothing    -> hPutStrLn stdout $ defaultNix expr
       _ -> error "failed to parse intermediary initialPackages.nix file"
       where
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
-          putStrLn $ "Updating deps from " ++ baseDir
+          hPutStrLn stderr $ "Updating deps from " ++ baseDir
           result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
           case result of
             Right pkgs -> do
-              putStrLn "Haskell dependencies:"
-              mapM_ putStrLn $ lines pkgs
+              hPutStrLn stderr "Haskell dependencies:"
+              mapM_ (hPutStrLn stderr) $ lines pkgs
               _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> lines pkgs
               return ()
             Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
@@ -217,7 +221,6 @@ toNix args@Args{..} remoteUri baseDir StackConfig{..} =
 
         overrideFor :: FilePath -> IO String
         overrideFor nixFile = do
-          putStrLn $ "Generating override for " <> nixFile
           deps <- externalDeps
           return $ "    " <> nameOf nixFile <> " = callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
           where
