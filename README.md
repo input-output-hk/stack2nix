@@ -14,13 +14,23 @@
 
 ## Installation
 
-Other installation methods will be supported, but for now this is the
-recommended way.
+There are two options. The first is to install stack2nix and its dependencies on your machine directly, and the second is to use the supported virtual machine configuration.
+
+If there are difficulties please file an issue. Generally the virtual machine approach should be more reliable.
+
+### Native Environment
 
 1. Install [nix](https://nixos.org/nix/).
 2. Clone this repo.
-4. Run `stack install` to install.
-5. Ensure `cabal2nix` version 2.2.1 is in your PATH.
+3. Run `stack install` to install.
+4. Ensure `cabal2nix` v2.2.1 and `stack2nix` are in your `$PATH`.
+
+### Virtual Machine
+
+1. Install [VirtualBox](https://www.virtualbox.org/wiki/VirtualBox) and [Vagrant](https://www.vagrantup.com/).
+2. Clone this repo.
+3. Run `./scripts/vagrant.sh` and take a coffee break.
+4. If there are no errors, log into the VM: `vagrant ssh`.
 
 ## Usage
 
