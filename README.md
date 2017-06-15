@@ -22,7 +22,7 @@ If there are difficulties please file an issue. Generally the virtual machine ap
 
 1. Install [nix](https://nixos.org/nix/).
 2. Clone this repo.
-3. Run `stack install` to install.
+3. Run `nix-env -f . -i cabal2nix stack2nix` to install.
 4. Ensure `cabal2nix` v2.2.1 and `stack2nix` are in your `$PATH`.
 
 ### Virtual Machine
