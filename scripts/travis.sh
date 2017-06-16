@@ -11,11 +11,8 @@ nix-env -i stack nix-prefetch-git git cabal-install ghc
 
 # install cabal2nix 2.2.1
 stack --nix --system-ghc install cabal2nix-2.2.1
-which cabal2nix
-cabal2nix --version
 
 # build and install
-cabal update
 stack --nix --system-ghc setup
 stack --nix --system-ghc install
 

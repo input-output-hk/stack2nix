@@ -12,36 +12,41 @@ module Stack2nix
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
-import           Control.Exception          (SomeException, catch)
-import           Control.Monad              (unless)
-import qualified Data.ByteString            as BS
-import           Data.Fix                   (Fix (..))
-import           Data.Foldable              (traverse_)
-import           Data.List                  (foldl', sort)
-import qualified Data.Map.Strict            as Map
-import           Data.Maybe                 (fromMaybe)
-import           Data.Monoid                ((<>))
-import           Data.Text                  (Text, pack, unpack)
-import qualified Data.Traversable           as T
-import           Data.Yaml                  (FromJSON (..), (.!=), (.:), (.:?))
-import qualified Data.Yaml                  as Y
-import           Nix.Expr                   (Binding (..), NExpr, NExprF (..),
-                                             NKeyName (..), ParamSet (..),
-                                             Params (..))
-import           Nix.Parser                 (Result (..), parseNixFile)
-import           Nix.Pretty                 (prettyNix)
-import           Stack2nix.External         (cabal2nix)
-import           Stack2nix.External.Util    (runCmdFrom)
-import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
-                                             InternalCmd (..), git)
-import           System.Directory           (doesFileExist)
-import           System.Environment         (getEnv)
-import           System.FilePath            (dropExtension, isAbsolute,
-                                             normalise, takeDirectory,
-                                             takeFileName, (</>))
-import           System.FilePath.Glob       (glob)
-import           System.IO                  (hPutStrLn, stderr, stdout)
-import           System.IO.Temp             (withSystemTempDirectory)
+import           Control.Exception            (SomeException, catch,
+                                               onException)
+import           Control.Monad                (unless)
+import qualified Data.ByteString              as BS
+import           Data.Fix                     (Fix (..))
+import           Data.Foldable                (traverse_)
+import           Data.List                    (foldl', sort)
+import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (fromMaybe, listToMaybe)
+import           Data.Monoid                  ((<>))
+import           Data.Text                    (Text, pack, unpack)
+import qualified Data.Traversable             as T
+import           Data.Version                 (Version (..), parseVersion,
+                                               showVersion)
+import           Data.Yaml                    (FromJSON (..), (.!=), (.:),
+                                               (.:?))
+import qualified Data.Yaml                    as Y
+import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
+                                               NKeyName (..), ParamSet (..),
+                                               Params (..))
+import           Nix.Parser                   (Result (..), parseNixFile)
+import           Nix.Pretty                   (prettyNix)
+import           Stack2nix.External           (cabal2nix)
+import           Stack2nix.External.Util      (runCmd, runCmdFrom)
+import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
+                                               InternalCmd (..), git)
+import           System.Directory             (doesFileExist)
+import           System.Environment           (getEnv)
+import           System.FilePath              (dropExtension, isAbsolute,
+                                               normalise, takeDirectory,
+                                               takeFileName, (</>))
+import           System.FilePath.Glob         (glob)
+import           System.IO                    (hPutStrLn, stderr, stdout)
+import           System.IO.Temp               (withSystemTempDirectory)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 
 data Args = Args
   { argRev     :: Maybe String
@@ -101,16 +106,44 @@ packageRenameMap =
                , ("servant-server", "servant-server_0_10")
                ]
 
+checkRuntimeDeps :: IO ()
+checkRuntimeDeps = do
+  checkVer "cabal2nix" "2.2.1"
+  checkVer "git" "2"
+  checkVer "cabal" "1"
+  where
+    checkVer prog minVer = do
+      hPutStrLn stderr $ unwords ["Ensuring", prog, "version is >=", minVer, "..."]
+      result <- runCmd prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
+      case result of
+        Right out ->
+          let
+            -- heuristic for parsing version from stdout
+            firstLine = head . lines
+            lastWord = head . reverse . words
+            ver = parseVer . lastWord . firstLine $ out
+          in
+          unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
+        Left err  -> error err
+
+    parseVer :: String -> Maybe Version
+    parseVer =
+      fmap fst . listToMaybe . reverse . readP_to_S parseVersion
+
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
-  home <- getEnv "HOME"
-  runCmdFrom home "cabal" ["update"] >> return ()
+  checkRuntimeDeps
+  updateCabalPackageIndex
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
   then handleStackConfig Nothing argUri
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
+    updateCabalPackageIndex :: IO ()
+    updateCabalPackageIndex =
+      getEnv "HOME" >>= \home -> runCmdFrom home "cabal" ["update"] >> return ()
+
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do
       git $ OutsideRepo $ Clone argUri tmpDir
