@@ -14,11 +14,11 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
 import           Control.Exception            (SomeException, catch,
                                                onException)
-import           Control.Monad                (unless)
+import           Control.Monad                (mapM_, unless)
 import qualified Data.ByteString              as BS
 import           Data.Fix                     (Fix (..))
 import           Data.Foldable                (traverse_)
-import           Data.List                    (foldl', sort)
+import           Data.List                    (foldl', sort, union, (\\))
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe)
 import           Data.Monoid                  ((<>))
@@ -32,7 +32,8 @@ import qualified Data.Yaml                    as Y
 import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
                                                NKeyName (..), ParamSet (..),
                                                Params (..))
-import           Nix.Parser                   (Result (..), parseNixFile)
+import           Nix.Parser                   (Result (..), parseNixFile,
+                                               parseNixString)
 import           Nix.Pretty                   (prettyNix)
 import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
@@ -208,6 +209,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
     _ <- mapPool c2nPoolSize (genNixFile outDir) packages
     overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
     _ <- mapPool c2nPoolSize (genNixFile outDir) packages
+    _ <- mapPool c2nPoolSize patchNixFile =<< glob (outDir </> "*.nix")
     applyRenameMap packageRenameMap =<< glob (outDir </> "*.nix")
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
@@ -225,9 +227,10 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
           case result of
             Right pkgs -> do
+              let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
-              mapM_ (hPutStrLn stderr) $ lines pkgs
-              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> lines pkgs
+              mapM_ (hPutStrLn stderr) pkgs'
+              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
               return ()
             Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
           glob (outDir </> "*.nix")
@@ -241,6 +244,38 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
         genNixFile outDir (RemotePkg RemotePkgConf{..}) =
           cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir)
+
+        patchNixFile :: FilePath -> IO ()
+        patchNixFile fname = do
+          contents <- readFile fname
+          case parseNixString contents of
+            Success expr ->
+              case takeFileName fname of
+                "hspec.nix" -> do
+                  writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps) expr
+                _ -> writeFile fname $ show $ prettyNix $ stripNonEssentialDeps expr
+            _ -> error "failed to parse intermediary nix package file"
+
+        addParam :: String -> NExpr -> NExpr
+        addParam param expr =
+          let contents = show $ prettyNix expr
+              (l:ls) = lines contents
+              (openBrace, params) = splitAt 1 (words l)
+              l' = unwords $ openBrace ++ [param ++ ", "] ++ params
+          in
+          case parseNixString $ unlines (l':ls) of
+            Success expr' -> expr'
+            _             -> expr
+
+        stripNonEssentialDeps :: NExpr -> NExpr
+        stripNonEssentialDeps expr =
+          let sectsToDrop = ["testHaskellDepends", "testToolDepends", "benchmarkHaskellDepends", "benchmarkToolDepends"]
+              sectsToKeep = ["executableHaskellDepends", "executableToolDepends", "libraryHaskellDepends", "librarySystemDepends", "libraryToolDepends", "setupHaskellDepends"]
+              collectDeps sects = foldr union [] $ fmap (dependenciesFromSection expr) sects
+              depsToStrip = collectDeps sectsToDrop \\ collectDeps sectsToKeep
+              expr' = foldl dropDependencySection expr sectsToDrop
+          in
+          dropParams expr' depsToStrip
 
         handleExtraDep :: FilePath -> Text -> IO ()
         handleExtraDep outDir dep =
@@ -260,7 +295,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
             externalDeps :: IO String
             externalDeps = do
               deps <- librarySystemDeps nixFile
-              return . unwords $ fmap (\d -> d <> " = pkgs." <> d <> ";") deps
+              return . unwords $ fmap (\d -> unpack d <> " = pkgs." <> unpack d <> ";") deps
 
         pullInNixFiles :: FilePath -> IO ()
         pullInNixFiles nixFile = do
@@ -292,22 +327,32 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                   _ -> error $ "failed to parse referenced nix file '" ++ path ++ "'"
               patchPkgRef x                   = return x
 
-        librarySystemDeps :: FilePath -> IO [String]
+        dependenciesFromSection :: NExpr -> String -> [Text]
+        dependenciesFromSection expr name = do
+          case expr of
+            Fix (NAbs _ (Fix (NApp _ (Fix (NSet namedVars))))) ->
+              case lookupNamedVar namedVars name of
+                Just (Fix (NList deps)) ->
+                  foldl' (\acc x ->
+                            case x of
+                              Fix (NSym n) -> n : acc
+                              _            -> acc) [] deps
+                _ -> []
+            _ -> []
+
+        librarySystemDeps :: FilePath -> IO [Text]
         librarySystemDeps nixFile = do
           nf <- parseNixFile nixFile
           case nf of
-            Success expr ->
-              case expr of
-                Fix (NAbs _ (Fix (NApp _ (Fix (NSet namedVars))))) ->
-                  case lookupNamedVar namedVars "librarySystemDepends" of
-                    Just (Fix (NList deps)) ->
-                      return $ foldl' (\acc x ->
-                                         case x of
-                                           Fix (NSym name) -> unpack name : acc
-                                           _               -> acc) [] deps
-                    _ -> return []
-                _ -> return []
-            _ -> return []
+            Success expr -> return $ dependenciesFromSection expr "librarySystemDepends"
+            _            -> return []
+
+        dropDependencySection :: NExpr -> String -> NExpr
+        dropDependencySection expr name =
+          case expr of
+            Fix (NAbs a (Fix (NApp b (Fix (NSet namedVars))))) ->
+              Fix (NAbs a (Fix (NApp b (Fix (NSet $ dropNamedVar namedVars name)))))
+            _ -> expr
 
         lookupNamedVar :: [Binding a] -> String -> Maybe a
         lookupNamedVar [] _ = Nothing
@@ -318,6 +363,19 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               then Just val
               else lookupNamedVar xs name
             _ -> lookupNamedVar xs name
+
+        dropNamedVar :: [Binding a] -> String -> [Binding a]
+        dropNamedVar xs name = filter differentName xs
+          where
+            differentName (NamedVar [StaticKey k] _) = unpack k /= name
+            differentName _                          = True
+
+        dropParams :: NExpr -> [Text] -> NExpr
+        dropParams (Fix (NAbs (ParamSet (FixedParamSet paramMap) x)
+                    (Fix (NApp mkDeriv (Fix (NSet args)))))) names =
+          Fix (NAbs (ParamSet (FixedParamSet $ foldr Map.delete paramMap names) x)
+                    (Fix (NApp mkDeriv (Fix (NSet args)))))
+        dropParams x _ = x
 
         initialPackages overrides = unlines $
           [ "{ pkgs, stdenv, callPackage }:"
@@ -336,10 +394,9 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           , "with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });"
           , ""
           , "let"
-          , "  hackagePackages = import <nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix>;"
           , "  stackPackages = " ++ show (prettyNix pkgsNixExpr) ++ ";"
           , "in"
           , "compiler.override {"
-          , "  initialPackages = (args: self: (hackagePackages args self) // (stackPackages args self));"
+          , "  initialPackages = stackPackages;"
           , "}"
           ]
