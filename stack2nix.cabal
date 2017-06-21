@@ -1,5 +1,5 @@
 name:                stack2nix
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            Convert stack.yaml files into Nix build instructions.
 description:         Convert stack.yaml files into Nix build instructions.
 license:             BSD3
