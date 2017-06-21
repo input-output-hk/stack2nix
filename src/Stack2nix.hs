@@ -99,14 +99,6 @@ instance FromJSON RemotePkgConf where
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
 parseStackYaml = Y.decode
 
--- TODO: expose as CLI option
-packageRenameMap :: Map.Map Text Text
-packageRenameMap =
-  Map.fromList [ ("servant", "servant_0_10")
-               , ("servant-swagger", "servant-swagger_1_1_2_1")
-               , ("servant-server", "servant-server_0_10")
-               ]
-
 checkRuntimeDeps :: IO ()
 checkRuntimeDeps = do
   checkVer "cabal2nix" "2.2.1"
@@ -163,37 +155,6 @@ stack2nix args@Args{..} = do
         Just config -> toNix args remoteUri localDir config
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
 
-applyRenameMap :: Map.Map Text Text -> [FilePath] -> IO ()
-applyRenameMap nameMap = traverse_ renamePkgs
-  where
-    renamePkgs :: FilePath -> IO ()
-    renamePkgs nixFile = do
-      nf <- parseNixFile nixFile
-      case nf of
-        Success expr ->
-          writeFile nixFile $ show $ prettyNix $ patch expr
-        _ -> return ()          -- TODO: print warning, fail, or return Left error
-
-    patch :: NExpr -> NExpr
-    patch (Fix (NAbs (ParamSet (FixedParamSet paramMap) x)
-                (Fix (NApp mkDeriv (Fix (NSet args)))))) =
-      Fix (NAbs (ParamSet (FixedParamSet $ patchParams paramMap) x)
-                (Fix (NApp mkDeriv (Fix (NSet $ patchArgs args)))))
-    patch x = x
-
-    patchParams :: Map.Map Text (Maybe r) -> Map.Map Text (Maybe r)
-    patchParams = Map.mapKeys $ \k -> Map.findWithDefault k k nameMap
-
-    patchArgs :: [Binding (Fix NExprF)] -> [Binding (Fix NExprF)]
-    patchArgs = fmap $ \x ->
-                        case x of
-                          NamedVar k (Fix (NList names)) ->
-                            NamedVar k (Fix (NList $ fmap (\y ->
-                                                             case y of
-                                                               Fix (NSym name) -> Fix . NSym $ Map.findWithDefault name name nameMap
-                                                               _ -> y) names))
-                          _ -> x
-
 -- Credit: https://stackoverflow.com/a/18898822/204305
 mapPool :: T.Traversable t => Int -> (a -> IO b) -> t a -> IO (t b)
 mapPool max' f xs = do
@@ -210,7 +171,6 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
     overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
     _ <- mapPool c2nPoolSize (genNixFile outDir) packages
     _ <- mapPool c2nPoolSize patchNixFile =<< glob (outDir </> "*.nix")
-    applyRenameMap packageRenameMap =<< glob (outDir </> "*.nix")
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
@@ -281,16 +241,10 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         handleExtraDep outDir dep =
           cabal2nix ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
 
-        nameOf :: FilePath -> String
-        nameOf fname =
-          let defaultName = pack $ dropExtension . takeFileName $ fname
-          in
-            unpack $ Map.findWithDefault defaultName defaultName packageRenameMap
-
         overrideFor :: FilePath -> IO String
         overrideFor nixFile = do
           deps <- externalDeps
-          return $ "    " <> nameOf nixFile <> " = callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
+          return $ "    " <> (dropExtension . takeFileName) nixFile <> " = callPackage ./" <> takeFileName nixFile <> " { " <> deps <> " };"
           where
             externalDeps :: IO String
             externalDeps = do
