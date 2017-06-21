@@ -8,16 +8,16 @@ module Stack2nix
   , StackConfig(..)
   , parseStackYaml
   , stack2nix
+  , version
   ) where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
 import           Control.Exception            (SomeException, catch,
                                                onException)
-import           Control.Monad                (mapM_, unless)
+import           Control.Monad                (unless)
 import qualified Data.ByteString              as BS
 import           Data.Fix                     (Fix (..))
-import           Data.Foldable                (traverse_)
 import           Data.List                    (foldl', sort, union, (\\))
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe)
@@ -29,12 +29,14 @@ import           Data.Version                 (Version (..), parseVersion,
 import           Data.Yaml                    (FromJSON (..), (.!=), (.:),
                                                (.:?))
 import qualified Data.Yaml                    as Y
+import           Distribution.Text            (display)
 import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
                                                NKeyName (..), ParamSet (..),
                                                Params (..))
 import           Nix.Parser                   (Result (..), parseNixFile,
                                                parseNixString)
 import           Nix.Pretty                   (prettyNix)
+import           Paths_stack2nix              (version)
 import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
@@ -340,7 +342,11 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           ]
 
         defaultNix pkgsNixExpr = unlines
-          [ "{ pkgs ? (import <nixpkgs> {})"
+          [ "# Generated using stack2nix " ++ display version ++ "."
+          , "#"
+          , "# Only works with sufficiently recent nixpkgs, e.g. \"NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz\"."
+          , ""
+          , "{ pkgs ? (import <nixpkgs> {})"
           , ", compiler ? pkgs.haskell.packages.ghc802"
           , ", ghc ? pkgs.haskell.compiler.ghc802"
           , "}:"

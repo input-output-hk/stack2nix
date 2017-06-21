@@ -1,6 +1,7 @@
 module Main ( main ) where
 
 import           Data.Semigroup      ((<>))
+import           Distribution.Text   (display)
 import           Options.Applicative
 import           Stack2nix
 
@@ -13,6 +14,9 @@ args = Args
 main :: IO ()
 main = stack2nix =<< execParser opts
   where
-    opts = info (args <**> helper) $
+    opts = info
+      (helper
+       <*> infoOption ("stack2nix " ++ display version) (long "version" <> help "Show version number")
+       <*> args) $
       fullDesc
       <> progDesc "Generate a nix expression for a Haskell package using stack"
