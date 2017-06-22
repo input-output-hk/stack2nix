@@ -11,6 +11,10 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >= 1.10
 
+source-repository head
+  type:     git
+  location: https://github.com/input-output-hk/stack2nix.git
+
 library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
