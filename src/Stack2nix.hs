@@ -398,5 +398,6 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           , "in"
           , "compiler.override {"
           , "  initialPackages = stackPackages;"
+          , "  configurationCommon = { ... }: self: super: {};"
           , "}"
           ]
