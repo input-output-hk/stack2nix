@@ -4,7 +4,7 @@ set -ex
 
 # set up local environment
 PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
-NIX_PATH="nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz"
+NIX_PATH="nixpkgs=https://github.com/NixOS/nixpkgs/archive/9b948ea439ddbaa26740ce35543e7e35d2aa6d18.tar.gz"
 
 # install dependencies from nix
 nix-env -i stack nix-prefetch-git git cabal-install ghc
