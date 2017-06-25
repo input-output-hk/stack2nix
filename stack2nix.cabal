@@ -1,48 +1,54 @@
 name:                stack2nix
-version:             0.1.0.0
+version:             0.1.2.0
 synopsis:            Convert stack.yaml files into Nix build instructions.
 description:         Convert stack.yaml files into Nix build instructions.
-license:             BSD3
+license:             MIT
 license-file:        LICENSE
 author:              Jacob Mitchell
 maintainer:          jacob.mitchell@iohk.io
 category:            Distribution, Nix
 build-type:          Simple
-extra-source-files:  ChangeLog.md
-                   , README.md
+extra-source-files:  README.md
 cabal-version:       >= 1.10
+
+source-repository head
+  type:     git
+  location: https://github.com/input-output-hk/stack2nix.git
 
 library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
-                     , async
-                     , bytestring
-                     , containers
-                     , data-fix
-                     , directory
-                     , filepath
-                     , Glob
-                     , hnix >= 0.3.4
-                     , monad-parallel
-                     , process
-                     , SafeSemaphore
-                     , temporary
-                     , text
-                     , yaml
+                     , Cabal >= 1.24.2 && < 1.25
+                     , async >= 2.1.1.1 && < 2.2
+                     , bytestring >= 0.10.8.1 && < 0.11
+                     , containers >= 0.5.7.1 && < 0.6
+                     , data-fix == 0.0.4
+                     , directory >= 1.3 && < 1.4
+                     , filepath >= 1.4.1.1 && < 1.5
+                     , Glob >= 0.7.14 && < 0.8
+                     , hnix >= 0.3.4 && < 0.4
+                     , monad-parallel >= 0.7.2.2 && < 0.8
+                     , process >= 1.4.3 && < 1.5
+                     , SafeSemaphore >= 0.10.1 && < 0.11
+                     , temporary >= 1.2.0.4 && < 1.3
+                     , text >= 1.2.2.1 && < 1.3
+                     , yaml >= 0.8.22.1 && < 0.9
   exposed-modules:     Stack2nix
   other-modules:       Stack2nix.External
                      , Stack2nix.External.Cabal2nix
                      , Stack2nix.External.VCS
                      , Stack2nix.External.VCS.Git
                      , Stack2nix.External.Util
+                     , Paths_stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010
 
 executable stack2nix
   main-is:             Main.hs
   build-depends:       base >=4.9 && <4.10
+                     , Cabal >= 1.24.2 && < 1.25
                      , stack2nix
-                     , optparse-applicative
+                     , optparse-applicative >= 0.13.2 && < 0.14
   hs-source-dirs:      stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010
