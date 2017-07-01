@@ -20,7 +20,7 @@ import qualified Data.ByteString              as BS
 import           Data.Fix                     (Fix (..))
 import           Data.List                    (foldl', sort, union, (\\))
 import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (fromMaybe, listToMaybe)
+import           Data.Maybe                   (fromMaybe, listToMaybe, isJust)
 import           Data.Monoid                  ((<>))
 import           Data.Text                    (Text, pack, unpack)
 import qualified Data.Traversable             as T
@@ -41,7 +41,7 @@ import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
                                                InternalCmd (..), git)
-import           System.Directory             (doesFileExist)
+import           System.Directory             (doesFileExist, findExecutable)
 import           System.Environment           (getEnv)
 import           System.FilePath              (dropExtension, isAbsolute,
                                                normalise, takeDirectory,
@@ -101,8 +101,14 @@ instance FromJSON RemotePkgConf where
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
 parseStackYaml = Y.decode
 
+isInstalled :: String -> IO ()
+isInstalled prog = do
+    found <- fmap isJust $ findExecutable prog 
+    unless found (error $ unwords ["ERROR:", prog, "is not installed"])
+
 checkRuntimeDeps :: IO ()
 checkRuntimeDeps = do
+  isInstalled "stack"
   checkVer "cabal2nix" "2.2.1"
   checkVer "git" "2"
   checkVer "cabal" "1"
