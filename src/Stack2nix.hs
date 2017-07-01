@@ -61,7 +61,7 @@ data Args = Args
 data StackConfig = StackConfig
   { resolver  :: Text
   , packages  :: [Package]
-  , extraDeps :: [Text]
+  , extraDeps :: Maybe [Text]
   }
   deriving (Show, Eq)
 
@@ -81,7 +81,7 @@ instance FromJSON StackConfig where
     StackConfig <$>
     v .: "resolver" <*>
     v .: "packages" <*>
-    v .: "extra-deps"
+    v .:? "extra-deps"
   parseJSON _ = fail "Expected Object for StackConfig value"
 
 instance FromJSON Package where
