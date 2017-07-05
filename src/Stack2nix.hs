@@ -109,17 +109,15 @@ checkRuntimeDeps = do
   where
     checkVer prog minVer = do
       hPutStrLn stderr $ unwords ["Ensuring", prog, "version is >=", minVer, "..."]
-      result <- runCmd prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
-      case result of
-        Right out ->
-          let
-            -- heuristic for parsing version from stdout
-            firstLine = head . lines
-            lastWord = head . reverse . words
-            ver = parseVer . lastWord . firstLine $ out
-          in
-          unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
-        Left err  -> error err
+      (result, stdout, stderr) <- runCmd prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
+      if result
+      then let
+             -- heuristic for parsing version from stdout
+             firstLine = head . lines
+             lastWord = head . reverse . words
+             ver = parseVer . lastWord . firstLine $ stdout
+           in unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
+      else error stderr
 
     parseVer :: String -> Maybe Version
     parseVer =
@@ -186,15 +184,15 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           hPutStrLn stderr $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
-          case result of
-            Right pkgs -> do
-              let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
-              hPutStrLn stderr "Haskell dependencies:"
-              mapM_ (hPutStrLn stderr) pkgs'
-              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
-              return ()
-            Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
+          (result, stdout, stderr') <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
+          if result
+          then do
+            let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines stdout
+            hPutStrLn stderr "Haskell dependencies:"
+            mapM_ (hPutStrLn stderr) pkgs'
+            _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
+            return ()
+          else error $ unlines ["FAILED: stack list-dependencies", stderr']
           glob (outDir </> "*.nix")
 
         -- TODO: Remove this.

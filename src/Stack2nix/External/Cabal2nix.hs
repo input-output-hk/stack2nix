@@ -12,14 +12,13 @@ import           System.FilePath         ((</>))
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO ()
 cabal2nix uri commit subpath odir = do
-  result <- runCmd exe (args $ fromMaybe "." subpath)
-  case result of
-    Right stdout ->
-      let basename = pname stdout <> ".nix"
-          fname = maybe basename (</> basename) odir
-      in
-      writeFile fname stdout
-    Left stderr  -> error stderr
+  (result, stdout, stderr) <- runCmd exe (args $ fromMaybe "." subpath)
+  if result
+  then do
+         let basename = pname stdout <> ".nix"
+             fname    = maybe basename (</> basename) odir
+         writeFile fname stdout
+  else error stderr
   where
     exe = "cabal2nix"
 
