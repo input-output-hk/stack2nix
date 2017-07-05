@@ -8,6 +8,7 @@ import           Data.Monoid             ((<>))
 import           Data.Text               (Text, unpack)
 import           Stack2nix.External.Util (runCmd)
 import           System.FilePath         ((</>))
+import qualified System.IO               as Sys
 
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO ()
@@ -17,6 +18,7 @@ cabal2nix uri commit subpath odir = do
   then do
          let basename = pname stdout <> ".nix"
              fname    = maybe basename (</> basename) odir
+         Sys.hPutStrLn Sys.stderr stderr
          writeFile fname stdout
   else error stderr
   where
