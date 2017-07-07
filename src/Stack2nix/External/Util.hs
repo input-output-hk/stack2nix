@@ -15,10 +15,11 @@ runCmdFrom dir prog args = do
   let line1 = "runCmdFrom '" <> dir <> "' '" <> prog <> " " <> show (intercalate " " args)
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
   let line2 = "reply '" <> show exitCode <> "' '" <> show stdout <> "' '" <> show stderr
-  Sys.hPutStrLn Sys.stderr $ line1 <> "\n" <> line2
   case exitCode of
     ExitSuccess -> return $ (True,  stdout, stderr)
-    _           -> return $ (False, stdout, stderr)
+    _           -> do
+      Sys.hPutStrLn Sys.stderr $ line1 <> "\n" <> line2
+      return $ (False, stdout, stderr)
   where
     fromDir :: FilePath -> CreateProcess -> CreateProcess
     fromDir d procDesc = procDesc { cwd = Just d }
