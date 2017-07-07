@@ -12,9 +12,10 @@ type CmdResult = (Bool, String, String)
 
 runCmdFrom :: FilePath -> String -> [String] -> IO CmdResult
 runCmdFrom dir prog args = do
-  Sys.hPutStrLn Sys.stderr $ "runCmdFrom '" <> dir <> "' '" <> prog <> " " <> show (intercalate " " args)
+  let line1 = "runCmdFrom '" <> dir <> "' '" <> prog <> " " <> show (intercalate " " args)
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
-  Sys.hPutStrLn Sys.stderr $ "reply '" <> show exitCode <> "' '" <> show stdout <> "' '" <> show stderr
+  let line2 = "reply '" <> show exitCode <> "' '" <> show stdout <> "' '" <> show stderr
+  Sys.hPutStrLn Sys.stderr $ line1 <> "\n" <> line2
   case exitCode of
     ExitSuccess -> return $ (True,  stdout, stderr)
     _           -> return $ (False, stdout, stderr)
