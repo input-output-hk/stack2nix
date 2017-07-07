@@ -2,6 +2,7 @@ module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
 
+import           Control.Monad
 import           Data.List               (stripPrefix, takeWhile)
 import           Data.Maybe              (fromMaybe)
 import           Data.Monoid             ((<>))
@@ -19,7 +20,8 @@ cabal2nix argz uri commit subpath odir = do
   then do
          let basename = pname stdout <> ".nix"
              fname    = maybe basename (</> basename) odir
-         Sys.hPutStrLn Sys.stderr stderr
+         unless (null stderr) $
+           Sys.hPutStrLn Sys.stderr stderr
          writeFile fname stdout
   else error stderr
   where
