@@ -155,12 +155,12 @@ stack2nix args@Args{..} = do
 
 -- Credit: https://stackoverflow.com/a/18898822/204305
 mapPool :: T.Traversable t => Args -> (a -> IO b) -> t a -> IO (t b)
-mapPool Args{..} f xs = do
-  let max' = if argSerialise
-             then 1
-             else 4
-  sem <- new max'
-  mapConcurrently (with sem . f) xs
+mapPool Args{..} f xs =
+  if argSerialise
+    then  traverse f xs
+    else do
+    sem <- new 4
+    mapConcurrently (with sem . f) xs
 
 toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
 toNix args@Args{..} remoteUri baseDir StackConfig{..} =
