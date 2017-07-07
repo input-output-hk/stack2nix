@@ -39,6 +39,7 @@ library
                      , Stack2nix.External.VCS
                      , Stack2nix.External.VCS.Git
                      , Stack2nix.External.Util
+                     , Stack2nix.Types
                      , Paths_stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010

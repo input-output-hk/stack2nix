@@ -1,27 +1,40 @@
+{-# LANGUAGE RecordWildCards   #-}
+
 module Stack2nix.External.Util where
 
-import           Data.List        (intercalate)
-import           Data.Monoid      ((<>))
+import           Control.Monad
+import           Data.List
+import           Data.Monoid
 import           System.Directory (getCurrentDirectory)
 import           System.Exit      (ExitCode (..))
 import           System.Process   (CreateProcess (..))
 import           System.Process   (proc, readCreateProcessWithExitCode)
+import qualified System.IO               as Sys
+import           Text.Printf      (printf)
 
-runCmdFrom :: FilePath -> String -> [String] -> IO (Either String String)
-runCmdFrom dir prog args = do
+import           Stack2nix.Types
+
+
+type CmdResult = (Bool, String, String)
+
+
+runCmdFrom :: Args -> FilePath -> String -> [String] -> IO CmdResult
+runCmdFrom Args{..} dir prog args = do
+  when argVerbose $
+    Sys.hPutStrLn Sys.stderr $ "runCmdFrom \"" <> dir <> "\" " <> prog <> " " <> show (intercalate " " args)
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
   case exitCode of
-    ExitSuccess -> return $ Right stdout
-    _           -> return $ Left $ "Command failed: " ++ cmd ++ "\n" ++ stderr
+    ExitSuccess -> return $ (True,  stdout, stderr)
+    _           -> return $ if argErrorsFatal
+                            then error $ printf "FATAL: command %s %s returned exitCore=%s" prog (intercalate " " args) (show exitCode)
+                            else (False, stdout, stderr)
   where
     fromDir :: FilePath -> CreateProcess -> CreateProcess
     fromDir d procDesc = procDesc { cwd = Just d }
 
-    cmd = "cd \"" <> dir <> "\" && " <> intercalate " " (prog:args)
+runCmd :: Args -> String -> [String] -> IO CmdResult
+runCmd args prog progargs = getCurrentDirectory >>= (\d -> runCmdFrom args d prog progargs)
 
-runCmd :: String -> [String] -> IO (Either String String)
-runCmd prog args = getCurrentDirectory >>= (\d -> runCmdFrom d prog args)
-
-failHard :: Show a => Either a b -> IO ()
-failHard (Left stderr) = error $ show stderr
-failHard (Right _)     = mempty
+failHard :: CmdResult -> IO ()
+failHard (False, _, stderr) = error $ show stderr
+failHard (True, _, _)       = mempty

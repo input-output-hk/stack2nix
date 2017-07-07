@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
+
 module Stack2nix
   ( Args(..)
   , Package(..)
@@ -51,13 +53,9 @@ import           System.IO                    (hPutStrLn, stderr, stdout)
 import           System.IO.Temp               (withSystemTempDirectory)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 
-data Args = Args
-  { argRev     :: Maybe String
-  , argOutFile :: Maybe FilePath
-  , argUri     :: String
-  }
-  deriving (Show)
+import           Stack2nix.Types
 
+
 data StackConfig = StackConfig
   { resolver  :: Text
   , packages  :: [Package]
@@ -101,25 +99,23 @@ instance FromJSON RemotePkgConf where
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
 parseStackYaml = Y.decode
 
-checkRuntimeDeps :: IO ()
-checkRuntimeDeps = do
+checkRuntimeDeps :: Args -> IO ()
+checkRuntimeDeps args = do
   checkVer "cabal2nix" "2.2.1"
   checkVer "git" "2"
   checkVer "cabal" "1"
   where
     checkVer prog minVer = do
       hPutStrLn stderr $ unwords ["Ensuring", prog, "version is >=", minVer, "..."]
-      result <- runCmd prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
-      case result of
-        Right out ->
-          let
-            -- heuristic for parsing version from stdout
-            firstLine = head . lines
-            lastWord = head . reverse . words
-            ver = parseVer . lastWord . firstLine $ out
-          in
-          unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
-        Left err  -> error err
+      (result, stdout, stderr) <- runCmd args prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
+      if result
+      then let
+             -- heuristic for parsing version from stdout
+             firstLine = head . lines
+             lastWord = head . reverse . words
+             ver = parseVer . lastWord . firstLine $ stdout
+           in unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
+      else error stderr
 
     parseVer :: String -> Maybe Version
     parseVer =
@@ -127,7 +123,7 @@ checkRuntimeDeps = do
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
-  checkRuntimeDeps
+  checkRuntimeDeps args
   updateCabalPackageIndex
   isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
   if isLocalRepo
@@ -137,20 +133,20 @@ stack2nix args@Args{..} = do
   where
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex =
-      getEnv "HOME" >>= \home -> runCmdFrom home "cabal" ["update"] >> return ()
+      getEnv "HOME" >>= \home -> runCmdFrom args home "cabal" ["update"] >> return ()
 
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do
-      git $ OutsideRepo $ Clone argUri tmpDir
+      git args $ OutsideRepo $ Clone argUri tmpDir
       case argRev of
-        Just r  -> git $ InsideRepo tmpDir $ Checkout r
+        Just r  -> git args $ InsideRepo tmpDir $ Checkout r
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
       let fname = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist fname
-      unless alreadyExists $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
+      unless alreadyExists $ runCmdFrom args localDir "stack" ["init", "--system-ghc"]
                              >> return ()
       contents <- BS.readFile fname
       case parseStackYaml contents of
@@ -158,21 +154,21 @@ stack2nix args@Args{..} = do
         Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
 
 -- Credit: https://stackoverflow.com/a/18898822/204305
-mapPool :: T.Traversable t => Int -> (a -> IO b) -> t a -> IO (t b)
-mapPool max' f xs = do
-  sem <- new max'
-  mapConcurrently (with sem . f) xs
-
-c2nPoolSize :: Int
-c2nPoolSize = 4
+mapPool :: T.Traversable t => Args -> (a -> IO b) -> t a -> IO (t b)
+mapPool Args{..} f xs =
+  if argSerialise
+    then  traverse f xs
+    else do
+    sem <- new 4
+    mapConcurrently (with sem . f) xs
 
 toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
-toNix Args{..} remoteUri baseDir StackConfig{..} =
+toNix args@Args{..} remoteUri baseDir StackConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
-    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
-    overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
-    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
-    _ <- mapPool c2nPoolSize patchNixFile =<< glob (outDir </> "*.nix")
+    _ <- mapPool args (genNixFile outDir) packages
+    overrides <- mapPool args overrideFor =<< updateDeps outDir
+    _ <- mapPool args (genNixFile outDir) packages
+    _ <- mapPool args patchNixFile =<< glob (outDir </> "*.nix")
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
@@ -186,15 +182,15 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           hPutStrLn stderr $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
-          case result of
-            Right pkgs -> do
-              let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
-              hPutStrLn stderr "Haskell dependencies:"
-              mapM_ (hPutStrLn stderr) pkgs'
-              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
-              return ()
-            Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
+          (result, stdout, stderr') <- runCmdFrom args baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
+          if result
+          then do
+            let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines stdout
+            hPutStrLn stderr "Haskell dependencies:"
+            mapM_ (hPutStrLn stderr) pkgs'
+            _ <- mapPool args (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
+            return ()
+          else error $ unlines ["FAILED: stack list-dependencies", stderr']
           glob (outDir </> "*.nix")
 
         -- TODO: Remove this.
@@ -203,9 +199,9 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
 
         genNixFile :: FilePath -> Package -> IO ()
         genNixFile outDir (LocalPkg relPath) =
-          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
+          cabal2nix args (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
         genNixFile outDir (RemotePkg RemotePkgConf{..}) =
-          cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir)
+          cabal2nix args (unpack gitUrl) (Just commit) Nothing (Just outDir)
 
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
@@ -241,7 +237,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
 
         handleExtraDep :: FilePath -> Text -> IO ()
         handleExtraDep outDir dep =
-          cabal2nix ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
+          cabal2nix args ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
 
         overrideFor :: FilePath -> IO String
         overrideFor nixFile = do
@@ -328,9 +324,9 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
 
         dropParams :: NExpr -> [Text] -> NExpr
         dropParams (Fix (NAbs (ParamSet (FixedParamSet paramMap) x)
-                    (Fix (NApp mkDeriv (Fix (NSet args)))))) names =
+                    (Fix (NApp mkDeriv (Fix (NSet args')))))) names =
           Fix (NAbs (ParamSet (FixedParamSet $ foldr Map.delete paramMap names) x)
-                    (Fix (NApp mkDeriv (Fix (NSet args)))))
+                    (Fix (NApp mkDeriv (Fix (NSet args')))))
         dropParams x _ = x
 
         initialPackages overrides = unlines $
@@ -342,7 +338,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           ]
 
         defaultNix pkgsNixExpr = unlines
-          [ "# Generated using stack2nix " ++ display version ++ "."
+          [ "# Generated using stack2nix " ++ "" ++ "."
           , "#"
           , "# Only works with sufficiently recent nixpkgs, e.g. \"NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz\"."
           , ""
