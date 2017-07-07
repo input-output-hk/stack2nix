@@ -14,6 +14,7 @@ runCmdFrom :: FilePath -> String -> [String] -> IO CmdResult
 runCmdFrom dir prog args = do
   Sys.hPutStrLn Sys.stderr $ "runCmdFrom '" <> dir <> "' '" <> prog <> " " <> show (intercalate " " args)
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
+  Sys.hPutStrLn Sys.stderr $ "reply '" <> show exitCode <> "' '" <> show stdout <> "' '" <> show stderr
   case exitCode of
     ExitSuccess -> return $ (True,  stdout, stderr)
     _           -> return $ (False, stdout, stderr)
