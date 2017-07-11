@@ -26,9 +26,8 @@ cabal2nix uri commit subpath odir = do
     args :: FilePath -> [String]
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
-      -- , maybe [] (\d -> ["--subpath", d]) subpath
       , ["--subpath", dir]
-      , ["--no-check", "--no-haddock"]          -- TODO: only use on repos that need it.
+      , ["--no-check", "--no-haddock"]
       , [uri]
       ]
 
