@@ -8,7 +8,8 @@ import           Stack2nix
 args :: Parser Args
 args = Args
        <$> optional (strOption $ long "revision" <> help "revision to use when fetching from VCS")
-       <*> optional (strOption $ short 'o' <> help "output file for generated nix expression")
+       <*> optional (strOption $ short 'o' <> help "output file for generated nix expression" <> metavar "PATH")
+       <*> option auto (short 'j' <> help "number of threads for subprocesses" <> showDefault <> value 1 <> metavar "INT")
        <*> strArgument (metavar "URI")
 
 main :: IO ()

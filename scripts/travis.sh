@@ -17,12 +17,12 @@ stack --nix --system-ghc setup
 stack --nix --system-ghc install
 
 # smoke tests
-stack2nix -o /tmp/haskell-dummy-project1.nix \
+stack2nix -j4 -o /tmp/haskell-dummy-project1.nix \
 	  --revision 7e7d91d86ba0f86633ab37279c013879ade09e32 \
 	  https://github.com/jmitchell/haskell-dummy-project1.git
 nix-build -A haskell-dummy-package1 /tmp/haskell-dummy-project1.nix
 
-stack2nix -o /tmp/haskell-multi-package-demo1.nix \
+stack2nix -j4 -o /tmp/haskell-multi-package-demo1.nix \
 	  --revision e3d9bd6d6066dab5222ce53fb7d234f28eafa2d5 \
 	  https://github.com/jmitchell/haskell-multi-package-demo1.git
 nix-build -A haskell-multi-proj-demo1 /tmp/haskell-multi-package-demo1.nix

@@ -54,6 +54,7 @@ import           Text.ParserCombinators.ReadP (readP_to_S)
 data Args = Args
   { argRev     :: Maybe String
   , argOutFile :: Maybe FilePath
+  , argThreads :: Int
   , argUri     :: String
   }
   deriving (Show)
@@ -163,16 +164,13 @@ mapPool max' f xs = do
   sem <- new max'
   mapConcurrently (with sem . f) xs
 
-c2nPoolSize :: Int
-c2nPoolSize = 4
-
 toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
 toNix Args{..} remoteUri baseDir StackConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
-    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
-    overrides <- mapPool c2nPoolSize overrideFor =<< updateDeps outDir
-    _ <- mapPool c2nPoolSize (genNixFile outDir) packages
-    _ <- mapPool c2nPoolSize patchNixFile =<< glob (outDir </> "*.nix")
+    _ <- mapPool argThreads (genNixFile outDir) packages
+    overrides <- mapPool argThreads overrideFor =<< updateDeps outDir
+    _ <- mapPool argThreads (genNixFile outDir) packages
+    _ <- mapPool argThreads patchNixFile =<< glob (outDir </> "*.nix")
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
@@ -192,7 +190,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
               mapM_ (hPutStrLn stderr) pkgs'
-              _ <- mapPool c2nPoolSize (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
+              _ <- mapPool argThreads (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
               return ()
             Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
           glob (outDir </> "*.nix")
