@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -13,9 +14,8 @@ module Stack2nix
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
-import           Control.Exception            (SomeException, catch,
-                                               onException)
-import           Control.Monad                (unless)
+import           Control.Exception            (onException)
+import           Control.Monad                (unless, void)
 import qualified Data.ByteString              as BS
 import           Data.Fix                     (Fix (..))
 import           Data.List                    (foldl', sort, union, (\\))
@@ -43,11 +43,12 @@ import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
                                                InternalCmd (..), git)
 import           System.Directory             (doesFileExist)
 import           System.Environment           (getEnv)
+import           System.Exit                  (ExitCode (..))
 import           System.FilePath              (dropExtension, isAbsolute,
                                                normalise, takeDirectory,
                                                takeFileName, (</>))
 import           System.FilePath.Glob         (glob)
-import           System.IO                    (hPutStrLn, stderr, stdout)
+import           System.IO                    (hPutStrLn, stderr)
 import           System.IO.Temp               (withSystemTempDirectory)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 
@@ -68,14 +69,21 @@ data StackConfig = StackConfig
 
 data Package = LocalPkg FilePath
              | RemotePkg RemotePkgConf
-             deriving (Show, Eq)
+             deriving Eq
+
+instance Show Package where
+  show (LocalPkg path)  = path
+  show (RemotePkg conf) = show conf
 
 data RemotePkgConf = RemotePkgConf
   { gitUrl   :: Text
   , commit   :: Text
   , extraDep :: Bool
   }
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show RemotePkgConf where
+  show RemotePkgConf{ gitUrl, commit, extraDep } = unwords [unpack gitUrl, "(" <> unpack commit <> "; extraDep: " <> show extraDep <> ")"]
 
 instance FromJSON StackConfig where
   parseJSON (Y.Object v) =
@@ -110,17 +118,17 @@ checkRuntimeDeps = do
   where
     checkVer prog minVer = do
       hPutStrLn stderr $ unwords ["Ensuring", prog, "version is >=", minVer, "..."]
-      result <- runCmd prog ["--version"] `onException` (error $ "Failed to run " ++ prog ++ ". Not found in PATH.")
+      result <- runCmd prog ["--version"] `onException` error ("Failed to run " ++ prog ++ ". Not found in PATH.")
       case result of
-        Right out ->
+        (ExitSuccess, out, _) ->
           let
             -- heuristic for parsing version from stdout
             firstLine = head . lines
-            lastWord = head . reverse . words
+            lastWord = last . words
             ver = parseVer . lastWord . firstLine $ out
           in
           unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
-        Left err  -> error err
+        (ExitFailure _, _, err)  -> error err
 
     parseVer :: String -> Maybe Version
     parseVer =
@@ -138,21 +146,22 @@ stack2nix args@Args{..} = do
   where
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex =
-      getEnv "HOME" >>= \home -> runCmdFrom home "cabal" ["update"] >> return ()
+      getEnv "HOME" >>= \home -> void $ runCmdFrom home "cabal" ["update"]
 
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do
-      git $ OutsideRepo $ Clone argUri tmpDir
+      void $ git $ OutsideRepo $ Clone argUri tmpDir
       case argRev of
-        Just r  -> git $ InsideRepo tmpDir $ Checkout r
+        Just r  -> do
+          void $ git $ InsideRepo tmpDir (Checkout r)
+          return mempty
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
       let fname = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist fname
-      unless alreadyExists $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
-                             >> return ()
+      unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
       contents <- BS.readFile fname
       case parseStackYaml contents of
         Just config -> toNix args remoteUri localDir config
@@ -167,10 +176,10 @@ mapPool max' f xs = do
 toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
 toNix Args{..} remoteUri baseDir StackConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
-    _ <- mapPool argThreads (genNixFile outDir) packages
+    mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
     overrides <- mapPool argThreads overrideFor =<< updateDeps outDir
-    _ <- mapPool argThreads (genNixFile outDir) packages
-    _ <- mapPool argThreads patchNixFile =<< glob (outDir </> "*.nix")
+    mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
+    void $ mapPool argThreads patchNixFile =<< glob (outDir </> "*.nix")
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
@@ -178,7 +187,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
       Success expr ->
         case argOutFile of
           Just fname -> writeFile fname $ defaultNix expr
-          Nothing    -> hPutStrLn stdout $ defaultNix expr
+          Nothing    -> putStrLn $ defaultNix expr
       _ -> error "failed to parse intermediary initialPackages.nix file"
       where
         updateDeps :: FilePath -> IO [FilePath]
@@ -186,24 +195,37 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           hPutStrLn stderr $ "Updating deps from " ++ baseDir
           result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
           case result of
-            Right pkgs -> do
+            (ExitSuccess, pkgs, _) -> do
               let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
               mapM_ (hPutStrLn stderr) pkgs'
-              _ <- mapPool argThreads (\d -> catch (handleExtraDep outDir d) ignoreError) $ pack <$> pkgs'
+              mapPool argThreads (curry handleStackDep outDir) (pack <$> pkgs') >>= mapM_ (handleStackDepResult 1)
               return ()
-            Left err -> error $ unlines ["FAILED: stack list-dependencies", err]
+            (ExitFailure _, _, err) ->
+              error $ unlines ["FAILED: stack list-dependencies", err]
           glob (outDir </> "*.nix")
 
-        -- TODO: Remove this.
-        ignoreError :: SomeException -> IO ()
-        ignoreError _ = return ()
+        genNixFile :: (FilePath, Package) -> IO ((FilePath, Package), (ExitCode, String, String))
+        genNixFile input@(outDir, LocalPkg relPath) =
+          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir) >>= (\r -> return (input, r))
+        genNixFile input@(outDir, RemotePkg RemotePkgConf{..}) =
+          cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir) >>= (\r -> return (input, r))
 
-        genNixFile :: FilePath -> Package -> IO ()
-        genNixFile outDir (LocalPkg relPath) =
-          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
-        genNixFile outDir (RemotePkg RemotePkgConf{..}) =
-          cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir)
+        handleGenNixFileResult :: Int -> ((FilePath, Package), (ExitCode, String, String)) -> IO ()
+        handleGenNixFileResult _ ((_, p), (ExitSuccess, _, _)) =
+          hPutStrLn stderr $ "Nix expression generated for '" <> show p <> "'"
+          -- TODO: if verbose render stdout (and possibly stderr)
+        handleGenNixFileResult retries (input@(_, p), (ExitFailure c, out, err)) = do
+          hPutStrLn stderr $ "Failed to generate nix expression for '" <> show p <> "'."
+          if retries > 0
+            then
+            do
+              hPutStrLn stderr "Retrying..."
+              genNixFile input >>= handleGenNixFileResult (retries - 1)
+            else error $ unlines [ "ERROR: (" <> show c <> ") failed to generated nix expression for '" <> show input <> "'"
+                                 , "\tstderr: " <> err
+                                 , "\tstdout: " <> out
+                                 ]
 
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
@@ -211,9 +233,10 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           case parseNixString contents of
             Success expr ->
               case takeFileName fname of
-                "hspec.nix" -> do
+                "hspec.nix" ->
                   writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps) expr
-                _ -> writeFile fname $ show $ prettyNix $ stripNonEssentialDeps expr
+                _ ->
+                  writeFile fname $ show $ prettyNix $ stripNonEssentialDeps expr
             _ -> error "failed to parse intermediary nix package file"
 
         addParam :: String -> NExpr -> NExpr
@@ -237,9 +260,25 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           in
           dropParams expr' depsToStrip
 
-        handleExtraDep :: FilePath -> Text -> IO ()
-        handleExtraDep outDir dep =
-          cabal2nix ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
+        handleStackDep :: (FilePath, Text) -> IO ((FilePath, Text), (ExitCode, String, String))
+        handleStackDep input@(outDir, dep) = do
+          output <- cabal2nix ("cabal://" <> unpack dep) Nothing Nothing (Just outDir)
+          return (input, output)
+
+        handleStackDepResult :: Int -> ((FilePath, Text), (ExitCode, String, String)) -> IO ()
+        handleStackDepResult _ ((_, p), (ExitSuccess, _, _)) =
+          hPutStrLn stderr $ "Handled stack dependency '" <> show p <> "'."
+        handleStackDepResult retries (input@(_, p), (ExitFailure c, out, err)) = do
+          hPutStrLn stderr $ "Failed to handle stack dependency '" <> show p <> "'."
+          if retries > 0
+            then
+            do
+              hPutStrLn stderr "Retrying..."
+              handleStackDep input >>= handleStackDepResult (retries - 1)
+            else hPutStrLn stderr $ unlines [ "NON-FATAL ERROR: (" <> show c <> ") failed to generated nix expression for '" <> show p <> "'"
+                                            , "\tstderr: " <> err
+                                            , "\tstdout: " <> out
+                                            ]
 
         overrideFor :: FilePath -> IO String
         overrideFor nixFile = do
@@ -271,7 +310,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                   NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg)) deps)) -> do
                     pkg' <- patchPkgRef pkg
                     return $ NamedVar k (Fix (NApp (Fix (NApp (Fix (NSym "callPackage")) pkg')) deps))
-                  _ -> error $ "unhandled NamedVar"
+                  _ -> error "unhandled NamedVar"
 
               patchPkgRef (Fix (NLiteralPath path)) = do
                 let p = if isAbsolute path then path else normalise $ takeDirectory nixFile </> path
@@ -282,7 +321,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               patchPkgRef x                   = return x
 
         dependenciesFromSection :: NExpr -> String -> [Text]
-        dependenciesFromSection expr name = do
+        dependenciesFromSection expr name =
           case expr of
             Fix (NAbs _ (Fix (NApp _ (Fix (NSet namedVars))))) ->
               case lookupNamedVar namedVars name of

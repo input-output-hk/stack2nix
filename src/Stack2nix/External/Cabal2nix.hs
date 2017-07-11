@@ -7,19 +7,20 @@ import           Data.Maybe              (fromMaybe)
 import           Data.Monoid             ((<>))
 import           Data.Text               (Text, unpack)
 import           Stack2nix.External.Util (runCmd)
+import           System.Exit             (ExitCode (..))
 import           System.FilePath         ((</>))
 
 -- Requires cabal2nix >= 2.2 in PATH
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO ()
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO (ExitCode, String, String)
 cabal2nix uri commit subpath odir = do
   result <- runCmd exe (args $ fromMaybe "." subpath)
   case result of
-    Right stdout ->
+    (ExitSuccess, stdout, _) ->
       let basename = pname stdout <> ".nix"
           fname = maybe basename (</> basename) odir
       in
-      writeFile fname stdout
-    Left stderr  -> error stderr
+      writeFile fname stdout >> return result
+    _ -> return result
   where
     exe = "cabal2nix"
 

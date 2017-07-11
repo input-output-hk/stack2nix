@@ -4,6 +4,7 @@ module Stack2nix.External.VCS.Git
   ) where
 
 import           Stack2nix.External.Util (failHard, runCmd, runCmdFrom)
+import           System.Exit             (ExitCode (..))
 
 data Command = OutsideRepo ExternalCmd
              | InsideRepo FilePath InternalCmd
@@ -16,14 +17,14 @@ exe :: String
 exe = "git"
 
 -- Requires git binary in PATH
-git :: Command -> IO ()
+git :: Command -> IO (ExitCode, String, String)
 git (OutsideRepo cmd)    = runExternal cmd
 git (InsideRepo dir cmd) = runInternal dir cmd
 
-runExternal :: ExternalCmd -> IO ()
-runExternal (Clone uri dir) = do
-   runCmd exe ["clone", uri, dir] >>= failHard
+runExternal :: ExternalCmd -> IO (ExitCode, String, String)
+runExternal (Clone uri dir) =
+  runCmd exe ["clone", uri, dir] >>= failHard
 
-runInternal :: FilePath -> InternalCmd -> IO ()
-runInternal repoDir (Checkout ref) = do
-   runCmdFrom repoDir exe ["checkout", ref] >>= failHard
+runInternal :: FilePath -> InternalCmd -> IO (ExitCode, String, String)
+runInternal repoDir (Checkout ref) =
+  runCmdFrom repoDir exe ["checkout", ref] >>= failHard
