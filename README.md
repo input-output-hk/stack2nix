@@ -57,3 +57,4 @@ Sometimes it's convenient to build local Haskell packages. Assuming the current 
 ## Testing
 
 Run `./scripts/travis.sh` to build and test.
+ 
