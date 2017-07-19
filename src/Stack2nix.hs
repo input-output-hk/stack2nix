@@ -83,11 +83,14 @@ data RemotePkgConf = RemotePkgConf
   { gitUrl   :: Text
   , commit   :: Text
   , extraDep :: Bool
+  , subdirs  :: Maybe [Text]
   }
   deriving Eq
 
 instance Show RemotePkgConf where
-  show RemotePkgConf{ gitUrl, commit, extraDep } = unwords [unpack gitUrl, "(" <> unpack commit <> "; extraDep: " <> show extraDep <> ")"]
+  show RemotePkgConf{ gitUrl, commit, extraDep, subdirs } =
+    unwords [unpack gitUrl, "(" <> unpack commit <> "; extraDep: " <> show extraDep <>
+              maybe "" (\ds -> "; subdirs: " <> unwords (map unpack ds)) subdirs <> ")"]
 
 instance FromJSON StackConfig where
   parseJSON (Y.Object v) =
@@ -108,7 +111,8 @@ instance FromJSON RemotePkgConf where
     gitUrl <- loc .: "git"
     commit <- loc .: "commit"
     extra <- v .:? "extra-dep" .!= False
-    return $ RemotePkgConf gitUrl commit extra
+    subdirs <- v .:? "subdirs"
+    return $ RemotePkgConf gitUrl commit extra subdirs
   parseJSON _ = fail "Expected Object for RemotePkgConf value"
 
 parseStackYaml :: BS.ByteString -> Maybe StackConfig
@@ -214,7 +218,13 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         genNixFile input@(outDir, LocalPkg relPath) =
           cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir) >>= (\r -> return (input, r))
         genNixFile input@(outDir, RemotePkg RemotePkgConf{..}) =
-          cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir) >>= (\r -> return (input, r))
+          case subdirs of
+            Just sds -> do
+              result <- mapM (\sd -> cabal2nix (unpack gitUrl) (Just commit) (Just sd) (Just outDir) >>=
+                               (\r -> return (input, r))) (unpack <$> sds)
+              pure . head $ result
+            Nothing ->
+              cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir) >>= (\r -> return (input, r))
 
         handleGenNixFileResult :: Int -> ((FilePath, Package), (ExitCode, String, String)) -> IO ()
         handleGenNixFileResult _ ((_, p), (ExitSuccess, _, _)) =
