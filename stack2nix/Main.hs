@@ -10,6 +10,7 @@ args = Args
        <$> optional (strOption $ long "revision" <> help "revision to use when fetching from VCS")
        <*> optional (strOption $ short 'o' <> help "output file for generated nix expression" <> metavar "PATH")
        <*> option auto (short 'j' <> help "number of threads for subprocesses" <> showDefault <> value 1 <> metavar "INT")
+       <*> switch (long "test" <> help "enable tests")
        <*> strArgument (metavar "URI")
 
 main :: IO ()

@@ -17,8 +17,10 @@ import           Control.Concurrent.MSem
 import           Control.Exception            (onException)
 import           Control.Monad                (unless, void)
 import qualified Data.ByteString              as BS
+import           Data.Char                    (toLower)
 import           Data.Fix                     (Fix (..))
-import           Data.List                    (foldl', sort, union, (\\))
+import           Data.List                    (foldl', isInfixOf, isSuffixOf,
+                                               sort, union, (\\))
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe)
 import           Data.Monoid                  ((<>))
@@ -30,6 +32,7 @@ import           Data.Yaml                    (FromJSON (..), (.!=), (.:),
                                                (.:?))
 import qualified Data.Yaml                    as Y
 import           Distribution.Text            (display)
+import           Nix.Atoms                    (NAtom (..))
 import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
                                                NKeyName (..), ParamSet (..),
                                                Params (..))
@@ -46,7 +49,7 @@ import           System.Environment           (getEnv)
 import           System.Exit                  (ExitCode (..))
 import           System.FilePath              (dropExtension, isAbsolute,
                                                normalise, takeDirectory,
-                                               takeFileName, (</>))
+                                               takeFileName, (<.>), (</>))
 import           System.FilePath.Glob         (glob)
 import           System.IO                    (hPutStrLn, stderr)
 import           System.IO.Temp               (withSystemTempDirectory)
@@ -56,6 +59,7 @@ data Args = Args
   { argRev     :: Maybe String
   , argOutFile :: Maybe FilePath
   , argThreads :: Int
+  , argTest    :: Bool
   , argUri     :: String
   }
   deriving (Show)
@@ -179,7 +183,8 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
     mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
     overrides <- mapPool argThreads overrideFor =<< updateDeps outDir
     mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
-    void $ mapPool argThreads patchNixFile =<< glob (outDir </> "*.nix")
+    nixFiles <- glob (outDir </> "*.nix")
+    void $ mapPool argThreads patchNixFile nixFiles
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
     pullInNixFiles $ outDir </> "initialPackages.nix"
     nf <- parseNixFile $ outDir </> "initialPackages.nix"
@@ -193,7 +198,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           hPutStrLn stderr $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--separator", "-"]
+          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--test", "--separator", "-"]
           case result of
             (ExitSuccess, pkgs, _) -> do
               let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
@@ -214,7 +219,6 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         handleGenNixFileResult :: Int -> ((FilePath, Package), (ExitCode, String, String)) -> IO ()
         handleGenNixFileResult _ ((_, p), (ExitSuccess, _, _)) =
           hPutStrLn stderr $ "Nix expression generated for '" <> show p <> "'"
-          -- TODO: if verbose render stdout (and possibly stderr)
         handleGenNixFileResult retries (input@(_, p), (ExitFailure c, out, err)) = do
           hPutStrLn stderr $ "Failed to generate nix expression for '" <> show p <> "'."
           if retries > 0
@@ -227,6 +231,29 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                                  , "\tstdout: " <> out
                                  ]
 
+        localPackageName :: FilePath -> IO String
+        localPackageName dir = do
+          [cabal] <- glob (dir </> "*.cabal")
+          contents <- readFile cabal
+          let nameLine = head $ [x | x <- lines contents, "name" `isInfixOf` map toLower x]
+          pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
+
+        packagesToTest :: IO [String]
+        packagesToTest =
+          if argTest
+          then do
+            let pkgs = filter (\p -> case p of
+                                       LocalPkg _  -> True
+                                       RemotePkg _ -> False) packages
+            pkgNames <- mapM (\p -> case p of
+                                      LocalPkg subDir -> localPackageName (baseDir </> subDir)
+                                      RemotePkg _ -> undefined) pkgs
+            let
+              parsePkgName = reverse . (\s -> if null s then "" else tail s) . dropWhile (/= '-') . reverse . unpack
+              extraDeps' = map parsePkgName extraDeps
+            pure $ filter (\n -> not $ n `elem` extraDeps') pkgNames
+          else pure []
+
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
           contents <- readFile fname
@@ -234,10 +261,30 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
             Success expr ->
               case takeFileName fname of
                 "hspec.nix" ->
-                  writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps) expr
-                _ ->
-                  writeFile fname $ show $ prettyNix $ stripNonEssentialDeps expr
+                  writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps False) expr
+                _ -> do
+                  pkgs <- packagesToTest
+                  let
+                    shouldTest = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
+                    expr' = stripNonEssentialDeps shouldTest (if shouldTest then enableCheck expr else expr)
+                  writeFile fname $ show $ prettyNix expr'
             _ -> error "failed to parse intermediary nix package file"
+
+        enableCheck :: NExpr -> NExpr
+        enableCheck expr =
+          case expr of
+            Fix (NAbs paramSet (Fix (NApp mkDeriv (Fix (NSet attrs))))) ->
+              let attrs' = map patchAttr attrs in
+              Fix (NAbs paramSet (Fix (NApp mkDeriv (Fix (NSet attrs')))))
+            _ ->
+              error $ "unhandled nix expression format\n" ++ show expr
+          where
+            patchAttr :: Binding (Fix NExprF) -> Binding (Fix NExprF)
+            patchAttr attr =
+              case attr of
+                NamedVar [StaticKey "doCheck"] (Fix (NConstant (NBool False))) ->
+                  NamedVar [StaticKey "doCheck"] (Fix (NConstant (NBool True)))
+                x -> x
 
         addParam :: String -> NExpr -> NExpr
         addParam param expr =
@@ -250,10 +297,19 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
             Success expr' -> expr'
             _             -> expr
 
-        stripNonEssentialDeps :: NExpr -> NExpr
-        stripNonEssentialDeps expr =
-          let sectsToDrop = ["testHaskellDepends", "testToolDepends", "benchmarkHaskellDepends", "benchmarkToolDepends"]
-              sectsToKeep = ["executableHaskellDepends", "executableToolDepends", "libraryHaskellDepends", "librarySystemDepends", "libraryToolDepends", "setupHaskellDepends"]
+        stripNonEssentialDeps :: Bool -> NExpr -> NExpr
+        stripNonEssentialDeps keepTests expr =
+          let benchSects = ["benchmarkHaskellDepends", "benchmarkToolDepends"]
+              testSects = ["testHaskellDepends", "testToolDepends"]
+              otherSects = [ "executableHaskellDepends"
+                           , "executableToolDepends"
+                           , "libraryHaskellDepends"
+                           , "librarySystemDepends"
+                           , "libraryToolDepends"
+                           , "setupHaskellDepends"
+                           ]
+              sectsToDrop = if keepTests then benchSects else benchSects `union` testSects
+              sectsToKeep = if keepTests then otherSects `union` testSects else otherSects
               collectDeps sects = foldr union [] $ fmap (dependenciesFromSection expr) sects
               depsToStrip = collectDeps sectsToDrop \\ collectDeps sectsToKeep
               expr' = foldl dropDependencySection expr sectsToDrop
