@@ -17,8 +17,10 @@ import           Control.Concurrent.MSem
 import           Control.Exception            (onException)
 import           Control.Monad                (unless, void)
 import qualified Data.ByteString              as BS
+import           Data.Char                    (toLower)
 import           Data.Fix                     (Fix (..))
-import           Data.List                    (foldl', sort, union, (\\))
+import           Data.List                    (foldl', isInfixOf, isSuffixOf,
+                                               sort, union, (\\))
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (fromMaybe, listToMaybe)
 import           Data.Monoid                  ((<>))
@@ -57,7 +59,7 @@ data Args = Args
   { argRev     :: Maybe String
   , argOutFile :: Maybe FilePath
   , argThreads :: Int
-  , argTestPkg :: Maybe String
+  , argTest    :: Bool
   , argUri     :: String
   }
   deriving (Show)
@@ -217,7 +219,6 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         handleGenNixFileResult :: Int -> ((FilePath, Package), (ExitCode, String, String)) -> IO ()
         handleGenNixFileResult _ ((_, p), (ExitSuccess, _, _)) =
           hPutStrLn stderr $ "Nix expression generated for '" <> show p <> "'"
-          -- TODO: if verbose render stdout (and possibly stderr)
         handleGenNixFileResult retries (input@(_, p), (ExitFailure c, out, err)) = do
           hPutStrLn stderr $ "Failed to generate nix expression for '" <> show p <> "'."
           if retries > 0
@@ -230,6 +231,29 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                                  , "\tstdout: " <> out
                                  ]
 
+        localPackageName :: FilePath -> IO String
+        localPackageName dir = do
+          [cabal] <- glob (dir </> "*.cabal")
+          contents <- readFile cabal
+          let nameLine = head $ [x | x <- lines contents, "name" `isInfixOf` map toLower x]
+          pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
+
+        packagesToTest :: IO [String]
+        packagesToTest =
+          if argTest
+          then do
+            let pkgs = filter (\p -> case p of
+                                       LocalPkg _  -> True
+                                       RemotePkg _ -> False) packages
+            pkgNames <- mapM (\p -> case p of
+                                      LocalPkg subDir -> localPackageName (baseDir </> subDir)
+                                      RemotePkg _ -> undefined) pkgs
+            let
+              parsePkgName = reverse . (\s -> if null s then "" else tail s) . dropWhile (/= '-') . reverse . unpack
+              extraDeps' = map parsePkgName extraDeps
+            pure $ filter (\n -> not $ n `elem` extraDeps') pkgNames
+          else pure []
+
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
           contents <- readFile fname
@@ -238,13 +262,12 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               case takeFileName fname of
                 "hspec.nix" ->
                   writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps False) expr
-                name ->
-                  case argTestPkg of
-                    Just pkg -> do
-                      let shouldTest = name == pkg <.> "nix"
-                      writeFile fname $ show $ prettyNix $ stripNonEssentialDeps shouldTest (if shouldTest then enableCheck expr else expr)
-                    Nothing ->
-                      writeFile fname $ show $ prettyNix $ stripNonEssentialDeps False expr
+                _ -> do
+                  pkgs <- packagesToTest
+                  let
+                    shouldTest = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
+                    expr' = stripNonEssentialDeps shouldTest (if shouldTest then enableCheck expr else expr)
+                  writeFile fname $ show $ prettyNix expr'
             _ -> error "failed to parse intermediary nix package file"
 
         enableCheck :: NExpr -> NExpr
