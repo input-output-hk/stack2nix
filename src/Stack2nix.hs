@@ -202,7 +202,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
         updateDeps :: FilePath -> IO [FilePath]
         updateDeps outDir = do
           hPutStrLn stderr $ "Updating deps from " ++ baseDir
-          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--test", "--separator", "-"]
+          result <- runCmdFrom baseDir "stack" ["list-dependencies", "--nix", "--system-ghc", "--test", "--separator", "-"]
           case result of
             (ExitSuccess, pkgs, _) -> do
               let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
