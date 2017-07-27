@@ -60,6 +60,7 @@ data Args = Args
   , argOutFile :: Maybe FilePath
   , argThreads :: Int
   , argTest    :: Bool
+  , argHaddock :: Bool
   , argUri     :: String
   }
   deriving (Show)
@@ -248,21 +249,18 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           let nameLine = head $ [x | x <- lines contents, "name" `isInfixOf` map toLower x]
           pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
 
-        packagesToTest :: IO [String]
-        packagesToTest =
-          if argTest
-          then do
-            let pkgs = filter (\p -> case p of
-                                       LocalPkg _  -> True
-                                       RemotePkg _ -> False) packages
-            pkgNames <- mapM (\p -> case p of
-                                      LocalPkg subDir -> localPackageName (baseDir </> subDir)
-                                      RemotePkg _ -> undefined) pkgs
-            let
-              parsePkgName = reverse . (\s -> if null s then "" else tail s) . dropWhile (/= '-') . reverse . unpack
-              extraDeps' = map parsePkgName extraDeps
-            pure $ filter (\n -> not $ n `elem` extraDeps') pkgNames
-          else pure []
+        localPackages :: IO [String]
+        localPackages = do
+          let pkgs = filter (\p -> case p of
+                                     LocalPkg _  -> True
+                                     RemotePkg _ -> False) packages
+          pkgNames <- mapM (\p -> case p of
+                                    LocalPkg subDir -> localPackageName (baseDir </> subDir)
+                                    RemotePkg _ -> undefined) pkgs
+          let
+            parsePkgName = reverse . (\s -> if null s then "" else tail s) . dropWhile (/= '-') . reverse . unpack
+            extraDeps' = map parsePkgName extraDeps
+          pure $ filter (\n -> not $ n `elem` extraDeps') pkgNames
 
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
@@ -273,11 +271,13 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                 "hspec.nix" ->
                   writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps False) expr
                 _ -> do
-                  pkgs <- packagesToTest
+                  pkgs <- localPackages
                   let
-                    shouldTest = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
+                    shouldPatch = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
+                    shouldTest = argTest && shouldPatch
                     expr' = stripNonEssentialDeps shouldTest (if shouldTest then enableCheck expr else expr)
-                  writeFile fname $ show $ prettyNix expr'
+                    expr'' = if (argHaddock && shouldPatch) then enableHaddock expr' else expr'
+                  writeFile fname $ show $ prettyNix expr''
             _ -> error "failed to parse intermediary nix package file"
 
         enableCheck :: NExpr -> NExpr
@@ -294,6 +294,22 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               case attr of
                 NamedVar [StaticKey "doCheck"] (Fix (NConstant (NBool False))) ->
                   NamedVar [StaticKey "doCheck"] (Fix (NConstant (NBool True)))
+                x -> x
+
+        enableHaddock :: NExpr -> NExpr
+        enableHaddock expr =
+          case expr of
+            Fix (NAbs paramSet (Fix (NApp mkDeriv (Fix (NSet attrs))))) ->
+              let attrs' = map patchAttr attrs in
+              Fix (NAbs paramSet (Fix (NApp mkDeriv (Fix (NSet attrs')))))
+            _ ->
+              error $ "unhandled nix expression format\n" ++ show expr
+          where
+            patchAttr :: Binding (Fix NExprF) -> Binding (Fix NExprF)
+            patchAttr attr =
+              case attr of
+                NamedVar [StaticKey "doHaddock"] (Fix (NConstant (NBool False))) ->
+                  NamedVar [StaticKey "doHaddock"] (Fix (NConstant (NBool True)))
                 x -> x
 
         addParam :: String -> NExpr -> NExpr
