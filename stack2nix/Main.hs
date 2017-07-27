@@ -11,6 +11,7 @@ args = Args
        <*> optional (strOption $ short 'o' <> help "output file for generated nix expression" <> metavar "PATH")
        <*> option auto (short 'j' <> help "number of threads for subprocesses" <> showDefault <> value 1 <> metavar "INT")
        <*> switch (long "test" <> help "enable tests")
+       <*> switch (long "haddock" <> help "enable documentation generation")
        <*> strArgument (metavar "URI")
 
 main :: IO ()
