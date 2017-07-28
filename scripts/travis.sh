@@ -1,13 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+#! nix-shell -p stack nix-prefetch-git git cabal-install ghc -i bash
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/f4312a30241fd88c3b4bb38ba62999865073ad94.tar.gz
 
 set -ex
 
 # set up local environment
-PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
-NIX_PATH="nixpkgs=https://github.com/NixOS/nixpkgs/archive/9b948ea439ddbaa26740ce35543e7e35d2aa6d18.tar.gz"
-
-# install dependencies from nix
-nix-env -i stack nix-prefetch-git git cabal-install ghc
+PATH="$HOME/.local/bin:$PATH"
 
 # install cabal2nix 2.2.1
 stack --nix --system-ghc install cabal2nix-2.2.1
