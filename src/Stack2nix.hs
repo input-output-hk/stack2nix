@@ -4,10 +4,6 @@
 
 module Stack2nix
   ( Args(..)
-  , Package(..)
-  , RemotePkgConf(..)
-  , StackConfig(..)
-  , parseStackYaml
   , stack2nix
   , version
   ) where
@@ -16,7 +12,6 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.MSem
 import           Control.Exception            (onException)
 import           Control.Monad                (unless, void)
-import qualified Data.ByteString              as BS
 import           Data.Char                    (toLower)
 import           Data.Fix                     (Fix (..))
 import           Data.List                    (foldl', isInfixOf, isSuffixOf,
@@ -28,9 +23,6 @@ import           Data.Text                    (Text, pack, unpack)
 import qualified Data.Traversable             as T
 import           Data.Version                 (Version (..), parseVersion,
                                                showVersion)
-import           Data.Yaml                    (FromJSON (..), (.!=), (.:),
-                                               (.:?))
-import qualified Data.Yaml                    as Y
 import           Distribution.Text            (display)
 import           Nix.Atoms                    (NAtom (..))
 import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
@@ -40,6 +32,12 @@ import           Nix.Parser                   (Result (..), parseNixFile,
                                                parseNixString)
 import           Nix.Pretty                   (prettyNix)
 import           Paths_stack2nix              (version)
+import           Path                         (parseAbsFile)
+import           Stack.Config
+import           Stack.Prelude                (runRIO, LogLevel(..))
+import           Stack.Types.Config
+import           Stack.Types.BuildPlan
+import           Stack.Types.Runner
 import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
@@ -64,60 +62,6 @@ data Args = Args
   , argUri     :: String
   }
   deriving (Show)
-
-data StackConfig = StackConfig
-  { resolver  :: Text
-  , packages  :: [Package]
-  , extraDeps :: [Text]
-  }
-  deriving (Show, Eq)
-
-data Package = LocalPkg FilePath
-             | RemotePkg RemotePkgConf
-             deriving Eq
-
-instance Show Package where
-  show (LocalPkg path)  = path
-  show (RemotePkg conf) = show conf
-
-data RemotePkgConf = RemotePkgConf
-  { gitUrl   :: Text
-  , commit   :: Text
-  , extraDep :: Bool
-  , subdirs  :: Maybe [Text]
-  }
-  deriving Eq
-
-instance Show RemotePkgConf where
-  show RemotePkgConf{ gitUrl, commit, extraDep, subdirs } =
-    unwords [unpack gitUrl, "(" <> unpack commit <> "; extraDep: " <> show extraDep <>
-              maybe "" (\ds -> "; subdirs: " <> unwords (map unpack ds)) subdirs <> ")"]
-
-instance FromJSON StackConfig where
-  parseJSON (Y.Object v) =
-    StackConfig <$>
-    v .: "resolver" <*>
-    v .: "packages" <*>
-    v .: "extra-deps"
-  parseJSON _ = fail "Expected Object for StackConfig value"
-
-instance FromJSON Package where
-  parseJSON (Y.String v) = return $ LocalPkg $ unpack v
-  parseJSON obj@(Y.Object _) = RemotePkg <$> parseJSON obj
-  parseJSON _ = fail "Expected String or Object for Package value"
-
-instance FromJSON RemotePkgConf where
-  parseJSON (Y.Object v) = do
-    loc <- v .: "location"
-    gitUrl <- loc .: "git"
-    commit <- loc .: "commit"
-    extra <- v .:? "extra-dep" .!= False
-    subdirs <- v .:? "subdirs"
-    return $ RemotePkgConf gitUrl commit extra subdirs
-  parseJSON _ = fail "Expected Object for RemotePkgConf value"
-
-parseStackYaml :: BS.ByteString -> Maybe StackConfig
-parseStackYaml = Y.decode
 
 checkRuntimeDeps :: IO ()
 checkRuntimeDeps = do
@@ -168,13 +112,15 @@ stack2nix args@Args{..} = do
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
-      let fname = localDir </> "stack.yaml"
-      alreadyExists <- doesFileExist fname
+      let stackFile = localDir </> "stack.yaml"
+      alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
-      contents <- BS.readFile fname
-      case parseStackYaml contents of
-        Just config -> toNix args remoteUri localDir config
-        Nothing     -> error $ "Failed to parse " <> (localDir </> "stack.yaml")
+      fp <- parseAbsFile stackFile
+      lc <- withRunner LevelError True False ColorAuto False $ \runner -> do
+        -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
+        runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
+      buildConfig <- lcLoadBuildConfig lc Nothing -- compiler
+      toNix args remoteUri localDir buildConfig
 
 -- Credit: https://stackoverflow.com/a/18898822/204305
 mapPool :: T.Traversable t => Int -> (a -> IO b) -> t a -> IO (t b)
@@ -182,12 +128,16 @@ mapPool max' f xs = do
   sem <- new max'
   mapConcurrently (with sem . f) xs
 
-toNix :: Args -> Maybe String -> FilePath -> StackConfig -> IO ()
-toNix Args{..} remoteUri baseDir StackConfig{..} =
+toNix :: Args -> Maybe String -> FilePath -> BuildConfig -> IO ()
+toNix Args{..} remoteUri baseDir BuildConfig{..} =
   withSystemTempDirectory "s2n" $ \outDir -> do
-    mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
+    mapPool argThreads (curry genNixFile outDir) (fmap PLOther bcPackages ++ bcDependencies) >>= mapM_ (handleGenNixFileResult 1)
+    -- Generate full dependency graph by stack and generate packages
+    -- NOTE: this will download git and other packages to compute the full graph
+    -- TODO: filter out local dependencies
     overrides <- mapPool argThreads overrideFor =<< updateDeps outDir
-    mapPool argThreads (curry genNixFile outDir) packages >>= mapM_ (handleGenNixFileResult 1)
+    -- Override Nix files for local/Repo packages
+    mapPool argThreads (curry genNixFile outDir) (fmap PLOther bcPackages ++ bcDependencies) >>= mapM_ (handleGenNixFileResult 1)
     nixFiles <- glob (outDir </> "*.nix")
     void $ mapPool argThreads patchNixFile nixFiles
     writeFile (outDir </> "initialPackages.nix") $ initialPackages $ sort overrides
@@ -206,6 +156,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           result <- runCmdFrom baseDir "stack" ["list-dependencies", "--nix", "--system-ghc", "--test", "--separator", "-"]
           case result of
             (ExitSuccess, pkgs, _) -> do
+              -- TODO: filter out pkgs that are part of bcPackages/bcDependencies
               let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
               mapM_ (hPutStrLn stderr) pkgs'
@@ -215,20 +166,25 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
               error $ unlines ["FAILED: stack list-dependencies", err]
           glob (outDir </> "*.nix")
 
-        genNixFile :: (FilePath, Package) -> IO ((FilePath, Package), (ExitCode, String, String))
-        genNixFile input@(outDir, LocalPkg relPath) =
-          cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir) >>= (\r -> return (input, r))
-        genNixFile input@(outDir, RemotePkg RemotePkgConf{..}) =
-          case subdirs of
-            Just sds -> do
-              result <- mapM (\sd -> cabal2nix (unpack gitUrl) (Just commit) (Just sd) (Just outDir) >>=
-                               (\r -> return (input, r))) (unpack <$> sds)
+        genNixFile :: (FilePath, PackageLocationIndex Subdirs) -> IO ((FilePath, PackageLocationIndex Subdirs), (ExitCode, String, String))
+        genNixFile (_, pli@(PLIndex _)) = return (("", pli), (ExitSuccess, "", ""))
+        genNixFile input@(outDir, PLOther (PLFilePath relPath)) = do
+          r <- cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
+          return (input, r)
+        genNixFile input@(outDir, PLOther (PLRepo repo)) = do
+          case repoSubdirs repo of
+            ExplicitSubdirs sds -> do
+              result <- mapM (\sd -> cabal2nix (unpack (repoUrl repo)) (Just (repoCommit repo)) (Just sd) (Just outDir) >>=
+                               (\r -> return (input, r))) (sds)
               pure . head $ result
-            Nothing ->
-              cabal2nix (unpack gitUrl) (Just commit) Nothing (Just outDir) >>= (\r -> return (input, r))
+            DefaultSubdirs -> do
+              r <- cabal2nix (unpack (repoUrl repo)) (Just (repoCommit repo)) Nothing (Just outDir)
+              return (input, r)
+        genNixFile input@(outDir, PLOther (PLArchive _)) = do
+           error "PLArchive not implemented yet"
 
-        handleGenNixFileResult :: Int -> ((FilePath, Package), (ExitCode, String, String)) -> IO ()
-        handleGenNixFileResult _ ((_, p), (ExitSuccess, _, _)) =
+        handleGenNixFileResult :: Int -> ((FilePath, PackageLocationIndex Subdirs), (ExitCode, String, String)) -> IO ()
+        handleGenNixFileResult _ (input@(_, p), (ExitSuccess, _, _)) =
           hPutStrLn stderr $ "Nix expression generated for '" <> show p <> "'"
         handleGenNixFileResult retries (input@(_, p), (ExitFailure c, out, err)) = do
           hPutStrLn stderr $ "Failed to generate nix expression for '" <> show p <> "'."
@@ -242,6 +198,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
                                  , "\tstdout: " <> out
                                  ]
 
+        -- Given a path to a package with Cabal file inside, return Cabal package name
         localPackageName :: FilePath -> IO String
         localPackageName dir = do
           [cabal] <- glob (dir </> "*.cabal")
@@ -249,18 +206,13 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           let nameLine = head $ [x | x <- lines contents, "name" `isInfixOf` map toLower x]
           pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
 
+        -- Returns a list of names of local packages
         localPackages :: IO [String]
         localPackages = do
-          let pkgs = filter (\p -> case p of
-                                     LocalPkg _  -> True
-                                     RemotePkg _ -> False) packages
-          pkgNames <- mapM (\p -> case p of
-                                    LocalPkg subDir -> localPackageName (baseDir </> subDir)
-                                    RemotePkg _ -> undefined) pkgs
-          let
-            parsePkgName = reverse . (\s -> if null s then "" else tail s) . dropWhile (/= '-') . reverse . unpack
-            extraDeps' = map parsePkgName extraDeps
-          pure $ filter (\n -> not $ n `elem` extraDeps') pkgNames
+          mapM (\p -> case p of
+                        PLFilePath subDir -> localPackageName (baseDir </> subDir)
+                        PLArchive _ -> error "Arhive local dependencies not supported"
+                        PLRepo _ -> error "Repo local dependencies not supported") bcPackages
 
         patchNixFile :: FilePath -> IO ()
         patchNixFile fname = do
