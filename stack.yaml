@@ -13,4 +13,7 @@ extra-deps:
 
 flags: {}
 
+nix:
+  packages: [zlib,gmp]
+
 extra-package-dbs: []

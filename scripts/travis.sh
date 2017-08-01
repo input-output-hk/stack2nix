@@ -2,6 +2,8 @@
 #! nix-shell -p cabal2nix stack nix-prefetch-git git cabal-install ghc -i bash
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/f4312a30241fd88c3b4bb38ba62999865073ad94.tar.gz
 
+export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/f4312a30241fd88c3b4bb38ba62999865073ad94.tar.gz
+
 set -ex
 
 # set up local environment
@@ -12,7 +14,7 @@ cabal2nix --version
 
 # build and install
 stack --nix --system-ghc setup
-stack --nix --system-ghc install
+stack --nix --system-ghc install --fast
 
 # smoke tests
 stack2nix -j4 -o /tmp/haskell-dummy-project1.nix \
