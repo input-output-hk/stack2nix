@@ -12,12 +12,12 @@ import           System.FilePath         ((</>))
 
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO (ExitCode, String, String)
-cabal2nix uri commit subpath odir = do
+cabal2nix uri commit subpath outDir = do
   result <- runCmd exe (args $ fromMaybe "." subpath)
   case result of
     (ExitSuccess, stdout, _) ->
       let basename = pname stdout <> ".nix"
-          fname = maybe basename (</> basename) odir
+          fname = maybe basename (</> basename) outDir
       in
       writeFile fname stdout >> return result
     _ -> return result
