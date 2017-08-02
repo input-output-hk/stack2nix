@@ -42,7 +42,7 @@ import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
                                                InternalCmd (..), git)
-import           System.Directory             (doesFileExist)
+import           System.Directory             (doesFileExist, canonicalizePath)
 import           System.Environment           (getEnv)
 import           System.Exit                  (ExitCode (..))
 import           System.FilePath              (dropExtension, isAbsolute,
@@ -115,7 +115,8 @@ stack2nix args@Args{..} = do
       let stackFile = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
-      fp <- parseAbsFile stackFile
+      cp <- canonicalizePath stackFile
+      fp <- parseAbsFile cp
       lc <- withRunner LevelError True False ColorAuto False $ \runner -> do
         -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
         runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
