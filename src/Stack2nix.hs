@@ -31,18 +31,18 @@ import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
 import           Nix.Parser                   (Result (..), parseNixFile,
                                                parseNixString)
 import           Nix.Pretty                   (prettyNix)
-import           Paths_stack2nix              (version)
 import           Path                         (parseAbsFile)
+import           Paths_stack2nix              (version)
 import           Stack.Config
-import           Stack.Prelude                (runRIO, LogLevel(..))
-import           Stack.Types.Config
+import           Stack.Prelude                (LogLevel (..), runRIO)
 import           Stack.Types.BuildPlan
+import           Stack.Types.Config
 import           Stack.Types.Runner
 import           Stack2nix.External           (cabal2nix)
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
                                                InternalCmd (..), git)
-import           System.Directory             (doesFileExist, canonicalizePath)
+import           System.Directory             (canonicalizePath, doesFileExist)
 import           System.Environment           (getEnv)
 import           System.Exit                  (ExitCode (..))
 import           System.FilePath              (dropExtension, isAbsolute,
@@ -181,11 +181,11 @@ toNix Args{..} remoteUri baseDir BuildConfig{..} =
             DefaultSubdirs -> do
               r <- cabal2nix (unpack (repoUrl repo)) (Just (repoCommit repo)) Nothing (Just outDir)
               return (input, r)
-        genNixFile input@(outDir, PLOther (PLArchive _)) = do
+        genNixFile _input@(_outDir, PLOther (PLArchive _)) = do
            error "PLArchive not implemented yet"
 
         handleGenNixFileResult :: Int -> ((FilePath, PackageLocationIndex Subdirs), (ExitCode, String, String)) -> IO ()
-        handleGenNixFileResult _ (input@(_, p), (ExitSuccess, _, _)) =
+        handleGenNixFileResult _ (_input@(_, p), (ExitSuccess, _, _)) =
           hPutStrLn stderr $ "Nix expression generated for '" <> show p <> "'"
         handleGenNixFileResult retries (input@(_, p), (ExitFailure c, out, err)) = do
           hPutStrLn stderr $ "Failed to generate nix expression for '" <> show p <> "'."
