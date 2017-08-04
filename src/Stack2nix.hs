@@ -170,7 +170,7 @@ toNix Args{..} remoteUri baseDir BuildConfig{..} =
         genNixFile :: (FilePath, PackageLocationIndex Subdirs) -> IO ((FilePath, PackageLocationIndex Subdirs), (ExitCode, String, String))
         genNixFile (_, pli@(PLIndex _)) = return (("", pli), (ExitSuccess, "", ""))
         genNixFile input@(outDir, PLOther (PLFilePath relPath)) = do
-          r <- cabal2nix (fromMaybe baseDir remoteUri) (pack <$> argRev) (Just relPath) (Just outDir)
+          r <- cabal2nix (fromMaybe (baseDir </> relPath) remoteUri) (pack <$> argRev) (const relPath <$> remoteUri) (Just outDir)
           return (input, r)
         genNixFile input@(outDir, PLOther (PLRepo repo)) = do
           case repoSubdirs repo of
