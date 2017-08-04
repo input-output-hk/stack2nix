@@ -5,4 +5,6 @@ cache:
     - /nix
 before_script:
 - sudo mount -o remount,exec,size=4G,mode=755 /run/user || true
-script: ./scripts/travis.sh
+script:
+ - ./scripts/travis.sh
+ - ./scripts/check-nix-is-updated.sh
