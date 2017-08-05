@@ -4,7 +4,7 @@ packages:
 - '.'
 - location:
    git: https://github.com/commercialhaskell/stack.git
-   commit: 6eda315554dc780196275df9dec90a9fe57b8cf7
+   commit: 279744b934513454d5a11bae870432432edb196a
   extra-dep: true
 
 

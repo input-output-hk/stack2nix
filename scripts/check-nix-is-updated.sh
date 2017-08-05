@@ -15,7 +15,7 @@ fail_stack2nix_check() {
 # Get relative path to script directory
 scriptDir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 
-~/.local/bin/stack2nix . > stack2nix.nix
+~/.local/bin/stack2nix . > $scriptDir/../stack2nix.nix
 
 git diff --text --exit-code || fail_stack2nix_check
 
