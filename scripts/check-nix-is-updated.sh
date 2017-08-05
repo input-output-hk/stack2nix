@@ -1,8 +1,8 @@
 #!/usr/bin/env nix-shell
 #! nix-shell -p cabal2nix stack nix-prefetch-git git cabal-install ghc -i bash
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/f4312a30241fd88c3b4bb38ba62999865073ad94.tar.gz
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/a905b7cd0c2dc0714195a50bf176cd8e4593502d.tar.gz
 
-export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/f4312a30241fd88c3b4bb38ba62999865073ad94.tar.gz
+export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/a905b7cd0c2dc0714195a50bf176cd8e4593502d.tar.gz
 
 
 set -xe
