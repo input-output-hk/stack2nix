@@ -28,19 +28,22 @@ library
                      , Glob >= 0.7.14 && < 0.9
                      , hnix >= 0.3.4 && < 0.4
                      , monad-parallel >= 0.7.2.2 && < 0.8
+                     , path
+                     , pretty-show
                      , process >= 1.4.3 && < 1.5
                      , SafeSemaphore >= 0.10.1 && < 0.11
                      , stack >= 0.5.1
-                     , path
                      , temporary >= 1.2.0.4 && < 1.3
                      , text >= 1.2.2.1 && < 1.3
                      , yaml >= 0.8.22.1 && < 0.9
   exposed-modules:     Stack2nix
   other-modules:       Stack2nix.External
                      , Stack2nix.External.Cabal2nix
+                     , Stack2nix.External.Stack
                      , Stack2nix.External.VCS
                      , Stack2nix.External.VCS.Git
                      , Stack2nix.External.Util
+                     , Stack2nix.Util
                      , Paths_stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010

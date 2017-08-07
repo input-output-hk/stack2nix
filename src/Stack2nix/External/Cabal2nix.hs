@@ -9,6 +9,7 @@ import           Data.Text               (Text, unpack)
 import           Stack2nix.External.Util (runCmd)
 import           System.Exit             (ExitCode (..))
 import           System.FilePath         ((</>))
+import           System.IO               (hPutStrLn, stderr)
 
 -- Requires cabal2nix >= 2.2 in PATH
 cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO (ExitCode, String, String)
@@ -20,7 +21,14 @@ cabal2nix uri commit subpath outDir = do
           fname = maybe basename (</> basename) outDir
       in
       writeFile fname stdout >> return result
-    _ -> return result
+    (_, _, err) -> do
+      hPutStrLn stderr $ unwords [ "ERROR: cabal2nix failed on"
+                                 , uri
+                                 , "(rev: " ++ show commit ++ ";"
+                                 , "subpath: " ++ show subpath ++ "):"
+                                 , "\n" ++ err
+                                 ]
+      return result
   where
     exe = "cabal2nix"
 
