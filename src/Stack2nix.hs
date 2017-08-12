@@ -119,17 +119,17 @@ stack2nix args@Args{..} = do
       lc <- withRunner LevelError True False ColorAuto False $ \runner ->
         -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
         runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
-      buildConfig <- lcLoadBuildConfig lc Nothing -- compiler
-      toNix args remoteUri localDir buildConfig
+      toNix args remoteUri localDir lc
 
-toNix :: Args -> Maybe String -> FilePath -> BuildConfig -> IO ()
-toNix args@Args{..} remoteUri baseDir bc@BuildConfig{..} =
+toNix :: Args -> Maybe String -> FilePath -> LoadConfig -> IO ()
+toNix args@Args{..} remoteUri baseDir lc = do
+  bc <- lcLoadBuildConfig lc Nothing -- compiler
   withSystemTempDirectory "s2n" $ \outDir -> do
     let packages = filter (\p -> case p of
                                    PLIndex _          -> False
                                    PLOther (PLRepo _) -> True
-                                   _ -> error $ "Unsupported build config dependency: " ++ ppShow p) bcDependencies
-    runPlan baseDir outDir remoteUri (map toPackageRef packages) (patchAndMerge args baseDir bc outDir)
+                                   _ -> error $ "Unsupported build config dependency: " ++ ppShow p) (bcDependencies bc)
+    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc (patchAndMerge args baseDir bc outDir)
   where
     toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
     toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo
