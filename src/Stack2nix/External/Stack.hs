@@ -21,7 +21,9 @@ import           Stack.Build.Target            (NeedTargets (..))
 import           Stack.Options.BuildParser
 import           Stack.Options.GlobalParser
 import           Stack.Options.Utils           (GlobalOptsContext (..))
-import           Stack.Prelude                 hiding (mapConcurrently)
+import           Stack.Prelude                 hiding (mapConcurrently,
+                                                withSystemTempDirectory,
+                                                withTempDirectory)
 import           Stack.Runners                 (withBuildConfig)
 import           Stack.Types.Build             (Plan (..), Task (..),
                                                 TaskConfigOpts (..),
@@ -35,9 +37,13 @@ import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
 import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Util                (mapPool)
-import           System.Directory              (makeRelativeToCurrentDirectory)
+import           System.Directory              (createDirectoryIfMissing,
+                                                getHomeDirectory,
+                                                makeRelativeToCurrentDirectory)
 import           System.FilePath               ((</>))
 import           System.IO                     (hPutStrLn, stderr)
+import           System.IO.Temp                (withSystemTempDirectory,
+                                                withTempDirectory)
 import           Text.Show.Pretty
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
@@ -138,9 +144,17 @@ runPlan :: FilePath
 runPlan baseDir outDir remoteUri revPkgs lc doAfter = do
   let pkgsInConfig = nixPackages (configNix $ lcConfig lc)
   let pkgs = map unpack pkgsInConfig ++ ["ghc", "git"]
+
+  home <- getHomeDirectory
+  let stackRoot = home </> ".s2n/stack-root"
+  createDirectoryIfMissing True stackRoot
+
   globals <- queryNixPkgsPaths Include pkgs >>= \includes ->
              queryNixPkgsPaths Lib pkgs >>= \libs ->
-             pure $ globalOpts baseDir includes libs
+             withTempDirectory baseDir ".s2n-wd" $ \workDir -> do
+               hPutStrLn stderr $ "sr: " ++ show stackRoot
+               hPutStrLn stderr $ "wd: " ++ show workDir
+               pure $ globalOpts baseDir stackRoot workDir includes libs
   hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
   hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
   withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs doAfter
@@ -166,8 +180,8 @@ queryNixPkgsPaths kind pkgs = do
       query Lib     = "${lib.getLib pkg}/lib"
       query Include = "${lib.getDev pkg}/include"
 
-globalOpts :: FilePath -> Set FilePath -> Set FilePath -> GlobalOpts
-globalOpts currentDir extraIncludes extraLibs =
+globalOpts :: FilePath -> FilePath -> FilePath -> Set FilePath -> Set FilePath -> GlobalOpts
+globalOpts currentDir stackRoot workDir extraIncludes extraLibs =
   go { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
      , globalConfigMonoid =
          (globalConfigMonoid go)
@@ -177,7 +191,7 @@ globalOpts currentDir extraIncludes extraLibs =
      }
   where
     pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
-    args = ["--work-dir", "./.s2n", "--stack-root", "/tmp/s2n", "--jobs", "8", "--nix"]
+    args = ["--work-dir", workDir, "--stack-root", stackRoot, "--allow-different-user", "--jobs", "8", "--nix"]
     go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
 
 buildOpts :: BuildOptsCLI
