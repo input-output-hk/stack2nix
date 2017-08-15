@@ -124,7 +124,7 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs doAfter = do
   let pkgs = prioritize $ planToPackages plan ++ revPkgs
   liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
 
-  void $ liftIO $ cabal2nix "cabal://hscolour" Nothing Nothing (Just outDir)
+  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir)) $ words "hscolour stringbuilder"
   void $ liftIO $ mapPool 4 (genNixFile baseDir outDir remoteUri) pkgs
   liftIO doAfter
 

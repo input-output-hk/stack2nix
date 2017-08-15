@@ -3424,6 +3424,19 @@ self: {
           description = "Common lower-level functions needed by various streaming data libraries";
           license = stdenv.lib.licenses.mit;
         }) {};
+      stringbuilder = callPackage ({ base, mkDerivation, stdenv }:
+      mkDerivation {
+          pname = "stringbuilder";
+          version = "0.5.0";
+          sha256 = "1ap95xphqnrhv64c2a137wqslkdmb2jjd9ldb17gs1pw48k8hrl9";
+          libraryHaskellDepends = [
+            base
+          ];
+          doHaddock = false;
+          doCheck = false;
+          description = "A writer monad for multi-line string literals";
+          license = stdenv.lib.licenses.mit;
+        }) {};
       syb = callPackage ({ base, mkDerivation, stdenv }:
       mkDerivation {
           pname = "syb";
