@@ -28,16 +28,15 @@ import           Stack.Types.Build             (Plan (..), Task (..),
                                                 TaskType (..), lpDir)
 import           Stack.Types.BuildPlan         (Repo (..), Subdirs (..))
 import           Stack.Types.Config
-import           Stack.Types.Config.Build      (BuildCommand (..),
-                                                FileWatchOpts (..),
-                                                defaultBuildOptsCLI)
+import           Stack.Types.Config.Build      (BuildCommand (..))
 import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
                                                 packageIdentifierString)
 import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Util                (mapPool)
-import           System.FilePath               (makeRelative, (</>))
+import           System.Directory              (makeRelativeToCurrentDirectory)
+import           System.FilePath               ((</>))
 import           System.IO                     (hPutStrLn, stderr)
 import           Text.Show.Pretty
 
@@ -50,8 +49,8 @@ genNixFile :: FilePath -> FilePath -> Maybe String -> PackageRef -> IO ()
 genNixFile baseDir outDir uri pkgRef = do
   hPutStrLn stderr $ "Generating nix expression for " ++ show pkgRef
   case pkgRef of
-    LocalPackage _ident path mrev ->
-      let relPath = makeRelative baseDir path in
+    LocalPackage _ident path mrev -> do
+      relPath <- makeRelativeToCurrentDirectory path
       void $ cabal2nix (fromMaybe (baseDir </> relPath) uri) mrev (const relPath <$> uri) (Just outDir)
     CabalPackage pkg ->
       void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
