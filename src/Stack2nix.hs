@@ -105,9 +105,7 @@ stack2nix args@Args{..} = do
     tryGit tmpDir = do
       void $ git $ OutsideRepo $ Clone argUri tmpDir
       case argRev of
-        Just r  -> do
-          void $ git $ InsideRepo tmpDir (Checkout r)
-          return mempty
+        Just r  -> void $ git $ InsideRepo tmpDir (Checkout r)
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
@@ -130,7 +128,7 @@ toNix args@Args{..} remoteUri baseDir lc = withCurrentDirectory baseDir $ do
                                    PLIndex _          -> False
                                    PLOther (PLRepo _) -> True
                                    _ -> error $ "Unsupported build config dependency: " ++ ppShow p) (bcDependencies bc)
-    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc argThreads $ patchAndMerge args baseDir bc outDir
+    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc argRev argThreads $ patchAndMerge args baseDir bc outDir
   where
     toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
     toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo

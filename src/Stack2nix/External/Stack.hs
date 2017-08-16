@@ -4,11 +4,12 @@ module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
   ) where
 
+import           Control.Applicative           ((<|>))
 import           Data.List                     (nubBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
 import qualified Data.Set                      as S
-import           Data.Text                     (unpack)
+import           Data.Text                     (pack, unpack)
 import           Options.Applicative
 import           Stack.Build                   (mkBaseConfigOpts,
                                                 withLoadPackage)
@@ -46,13 +47,13 @@ data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | RepoPackage (Repo Subdirs)
                 deriving (Eq, Show)
 
-genNixFile :: FilePath -> FilePath -> Maybe String -> PackageRef -> IO ()
-genNixFile baseDir outDir uri pkgRef = do
+genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> PackageRef -> IO ()
+genNixFile baseDir outDir uri argRev pkgRef = do
   hPutStrLn stderr $ "Generating nix expression for " ++ show pkgRef
   case pkgRef of
     LocalPackage _ident path mrev -> do
       relPath <- makeRelativeToCurrentDirectory path
-      void $ cabal2nix (fromMaybe (baseDir </> relPath) uri) mrev (const relPath <$> uri) (Just outDir)
+      void $ cabal2nix (fromMaybe (baseDir </> relPath) uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
     CabalPackage pkg ->
       void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
     RepoPackage repo ->
@@ -100,10 +101,11 @@ planAndGenerate :: HasEnvConfig env
                 -> FilePath
                 -> Maybe String
                 -> [PackageRef]
+                -> Maybe String
                 -> Int
                 -> IO ()
                 -> RIO env ()
-planAndGenerate boptsCli baseDir outDir remoteUri revPkgs threads doAfter = do
+planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter = do
   bopts <- view buildOptsL
   let profiling = boptsLibProfile bopts || boptsExeProfile bopts
   let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
@@ -127,7 +129,7 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs threads doAfter = do
   liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
 
   void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir)) $ words "hscolour stringbuilder"
-  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri) pkgs
+  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev) pkgs
   liftIO doAfter
 
 runPlan :: FilePath
@@ -135,10 +137,11 @@ runPlan :: FilePath
         -> Maybe String
         -> [PackageRef]
         -> LoadConfig
+        -> Maybe String
         -> Int
         -> IO ()
         -> IO ()
-runPlan baseDir outDir remoteUri revPkgs lc threads doAfter = do
+runPlan baseDir outDir remoteUri revPkgs lc argRev threads doAfter = do
   let pkgsInConfig = nixPackages (configNix $ lcConfig lc)
   let pkgs = map unpack pkgsInConfig ++ ["ghc", "git"]
   let stackRoot = "/tmp/s2n"
@@ -148,7 +151,7 @@ runPlan baseDir outDir remoteUri revPkgs lc threads doAfter = do
              pure $ globalOpts baseDir stackRoot includes libs threads
   hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
   hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs threads doAfter
+  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev threads doAfter
 
 {-
   TODO:
