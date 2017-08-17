@@ -69,8 +69,8 @@ planToPackages plan = concatMap taskToPackages $ M.elems $ planTasks plan
     taskToPackages :: Task -> [PackageRef]
     taskToPackages task =
       let provided = case taskType task of
-                       TTLocal lp   -> LocalPackage (taskProvides task) (toFilePath $ lpDir lp) Nothing
-                       TTUpstream{} -> CabalPackage (taskProvides task) in
+                       TTFiles lp _il -> LocalPackage (taskProvides task) (toFilePath $ lpDir lp) Nothing
+                       TTIndex{} -> CabalPackage (taskProvides task) in
       provided : (CabalPackage <$> (S.toList . tcoMissing $ taskConfigOpts task))
 
 packageIdentifier :: PackageRef -> Maybe PackageIdentifier
