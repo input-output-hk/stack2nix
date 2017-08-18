@@ -12,6 +12,31 @@ with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; 
 let
   stackPackages = { callPackage, pkgs, stdenv }:
 self: {
+      Cabal = callPackage ({ array, base, binary, bytestring, containers, deepseq, directory, filepath, mkDerivation, pretty, process, stdenv, time, unix }:
+      mkDerivation {
+          pname = "Cabal";
+          version = "2.0.0.2";
+          sha256 = "0chhl2113jbahd5gychx9rdqj1aw22h7dyj6z44871hzqxngx6bc";
+          libraryHaskellDepends = [
+            array
+            base
+            binary
+            bytestring
+            containers
+            deepseq
+            directory
+            filepath
+            pretty
+            process
+            time
+            unix
+          ];
+          doHaddock = false;
+          doCheck = false;
+          homepage = "http://www.haskell.org/cabal/";
+          description = "A framework for packaging Haskell software";
+          license = stdenv.lib.licenses.bsd3;
+        }) {};
       Glob = callPackage ({ base, containers, directory, dlist, filepath, mkDerivation, stdenv, transformers, transformers-compat }:
       mkDerivation {
           pname = "Glob";
@@ -84,24 +109,6 @@ self: {
           doCheck = false;
           homepage = "https://github.com/nick8325/quickcheck";
           description = "Automatic testing of Haskell programs";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
-      SHA = callPackage ({ array, base, binary, bytestring, mkDerivation, stdenv }:
-      mkDerivation {
-          pname = "SHA";
-          version = "1.6.4.2";
-          sha256 = "134ajm87fm4lpsw86m9q8apv20dw4bpk46raa389zr6bcdpifw64";
-          isLibrary = true;
-          isExecutable = true;
-          libraryHaskellDepends = [
-            array
-            base
-            binary
-            bytestring
-          ];
-          doHaddock = false;
-          doCheck = false;
-          description = "Implementations of the SHA suite of message digest functions";
           license = stdenv.lib.licenses.bsd3;
         }) {};
       SafeSemaphore = callPackage ({ base, containers, mkDerivation, stdenv, stm }:
@@ -483,38 +490,18 @@ self: {
           description = "Bifunctors";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      binary-tagged = callPackage ({ SHA, aeson, array, base, base16-bytestring, binary, bytestring, containers, generics-sop, hashable, mkDerivation, nats, scientific, semigroups, stdenv, tagged, text, time, unordered-containers, vector }:
+      bindings-uname = callPackage ({ base, mkDerivation, stdenv }:
       mkDerivation {
-          pname = "binary-tagged";
-          version = "0.1.4.2";
-          sha256 = "1167rlb2lnib1vin9p75hp7fzcjqxljlw56bhmkwn05c5f6an7ri";
-          revision = "7";
-          editedCabalFile = "04l05gfbf3hf0pnkjpclyfqb9jaa665z4f89kf43lmd19qml6h04";
+          pname = "bindings-uname";
+          version = "0.1";
+          sha256 = "1lsw4dh5vgmfvrx62ns5kmngzlmjzbxkx43x5i2k5qlmzp1pa3hk";
           libraryHaskellDepends = [
-            aeson
-            array
             base
-            base16-bytestring
-            binary
-            bytestring
-            containers
-            generics-sop
-            hashable
-            nats
-            scientific
-            semigroups
-            SHA
-            tagged
-            text
-            time
-            unordered-containers
-            vector
           ];
           doHaddock = false;
           doCheck = false;
-          homepage = "https://github.com/phadej/binary-tagged#readme";
-          description = "Tagged binary serialisation";
-          license = stdenv.lib.licenses.bsd3;
+          description = "Low-level binding to POSIX uname(3)";
+          license = stdenv.lib.licenses.publicDomain;
         }) {};
       bitarray = callPackage ({ array, base, mkDerivation, stdenv }:
       mkDerivation {
@@ -1312,22 +1299,6 @@ self: {
           description = "Generic programming library for generalised deriving";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      generics-sop = callPackage ({ base, deepseq, ghc-prim, mkDerivation, stdenv, template-haskell }:
-      mkDerivation {
-          pname = "generics-sop";
-          version = "0.3.1.0";
-          sha256 = "1bazlhgmxcwv7vd44jhdx74cnhmaz6yy47jxfycapjj4mjrnp0x7";
-          libraryHaskellDepends = [
-            base
-            deepseq
-            ghc-prim
-            template-haskell
-          ];
-          doHaddock = false;
-          doCheck = false;
-          description = "Generic Programming using True Sums of Products";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
       gitrev = callPackage ({ base, base-compat, directory, filepath, mkDerivation, process, stdenv, template-haskell }:
       mkDerivation {
           pname = "gitrev";
@@ -1383,33 +1354,6 @@ self: {
           description = "Hackage security library";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      happy = callPackage ({ Cabal, array, base, containers, directory, filepath, mkDerivation, mtl, stdenv }:
-      mkDerivation {
-          pname = "happy";
-          version = "1.19.5";
-          sha256 = "1nj353q4z1g186fpjzf0dnsg71qhxqpamx8jy89rjjvv3p0kmw32";
-          revision = "2";
-          editedCabalFile = "1dvhv94lzmya938i5crshg9qbx7dxvkyxkhfbqimxkydxn7l2w7w";
-          isLibrary = false;
-          isExecutable = true;
-          setupHaskellDepends = [
-            base
-            Cabal
-            directory
-            filepath
-          ];
-          executableHaskellDepends = [
-            array
-            base
-            containers
-            mtl
-          ];
-          doHaddock = false;
-          doCheck = false;
-          homepage = "http://www.haskell.org/happy/";
-          description = "Happy is a parser generator for Haskell";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
       hashable = callPackage ({ base, bytestring, deepseq, ghc-prim, integer-gmp, mkDerivation, stdenv, text }:
       mkDerivation {
           pname = "hashable";
@@ -1431,19 +1375,6 @@ self: {
           doCheck = false;
           homepage = "http://github.com/tibbe/hashable";
           description = "A class for types that can be converted to a hash value";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
-      haskell-lexer = callPackage ({ base, mkDerivation, stdenv }:
-      mkDerivation {
-          pname = "haskell-lexer";
-          version = "1.0.1";
-          sha256 = "0rj3r1pk88hh3sk3mj61whp8czz5kpxhbc78xlr04bxwqjrjmm6p";
-          libraryHaskellDepends = [
-            base
-          ];
-          doHaddock = false;
-          doCheck = false;
-          description = "A fully compliant Haskell 98 lexer";
           license = stdenv.lib.licenses.bsd3;
         }) {};
       hastache = callPackage ({ base, blaze-builder, bytestring, containers, directory, filepath, ieee754, mkDerivation, mtl, process, stdenv, syb, text, transformers }:
@@ -2000,24 +1931,6 @@ self: {
           description = "A backtracking logic-programming monad";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      math-functions = callPackage ({ base, deepseq, mkDerivation, primitive, stdenv, vector, vector-th-unbox }:
-      mkDerivation {
-          pname = "math-functions";
-          version = "0.2.1.0";
-          sha256 = "1sv5vabsx332v1lpb6v3jv4zrzvpx1n7yprzd8wlcda5vsc5a6zp";
-          libraryHaskellDepends = [
-            base
-            deepseq
-            primitive
-            vector
-            vector-th-unbox
-          ];
-          doHaddock = false;
-          doCheck = false;
-          homepage = "https://github.com/bos/math-functions";
-          description = "Special functions and Chebyshev polynomials";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
       memory = callPackage ({ base, bytestring, deepseq, foundation, ghc-prim, mkDerivation, stdenv }:
       mkDerivation {
           pname = "memory";
@@ -2253,24 +2166,6 @@ self: {
           doCheck = false;
           homepage = "http://github.com/ekmett/mtl";
           description = "Monad classes, using functional dependencies";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
-      mwc-random = callPackage ({ base, math-functions, mkDerivation, primitive, stdenv, time, vector }:
-      mkDerivation {
-          pname = "mwc-random";
-          version = "0.13.6.0";
-          sha256 = "05j7yh0hh9nxic3dijmzv44kc6gzclvamdph7sq7w19wq57k6pq6";
-          libraryHaskellDepends = [
-            base
-            math-functions
-            primitive
-            time
-            vector
-          ];
-          doHaddock = false;
-          doCheck = false;
-          homepage = "https://github.com/bos/mwc-random";
-          description = "Fast, high quality pseudo random number generation";
           license = stdenv.lib.licenses.bsd3;
         }) {};
       nats = callPackage ({ mkDerivation, stdenv }:
@@ -2690,31 +2585,6 @@ self: {
           description = "Higher order versions of Prelude classes";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      pretty-show = callPackage ({ array, base, filepath, ghc-prim, happy, haskell-lexer, mkDerivation, pretty, stdenv }:
-      mkDerivation {
-          pname = "pretty-show";
-          version = "1.6.13";
-          sha256 = "1kbx72ybrpw0kh5zsd2kdw143qykbmd9lgmsvj57659y0k5l7fjm";
-          isLibrary = true;
-          isExecutable = true;
-          libraryHaskellDepends = [
-            array
-            base
-            filepath
-            ghc-prim
-            haskell-lexer
-            pretty
-          ];
-          libraryToolDepends = [ happy ];
-          executableHaskellDepends = [
-            base
-          ];
-          doHaddock = false;
-          doCheck = false;
-          homepage = "http://wiki.github.com/yav/pretty-show";
-          description = "Tools for working with derived `Show` instances and generic inspection of values";
-          license = stdenv.lib.licenses.mit;
-        }) {};
       primitive = callPackage ({ base, ghc-prim, mkDerivation, stdenv, transformers }:
       mkDerivation {
           pname = "primitive";
@@ -3116,14 +2986,14 @@ self: {
           description = "Combinator library for splitting lists";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      stack = callPackage ({ Cabal, aeson, annotated-wl-pprint, ansi-terminal, attoparsec, base, base64-bytestring, binary, binary-tagged, blaze-builder, bytestring, clock, conduit, conduit-extra, containers, cryptonite, cryptonite-conduit, deepseq, directory, echo, exceptions, extra, fast-logger, fetchgit, file-embed, filelock, filepath, fsnotify, generic-deriving, gitrev, hackage-security, hashable, hastache, hpack, hpc, http-client, http-client-tls, http-conduit, http-types, memory, microlens, microlens-mtl, mintty, mkDerivation, monad-logger, mtl, network-uri, open-browser, optparse-applicative, optparse-simple, path, path-io, persistent, persistent-sqlite, persistent-template, pid1, pretty, primitive, process, project-template, regex-applicative-text, resourcet, retry, semigroups, split, stdenv, stm, store, store-core, streaming-commons, tar, template-haskell, text, text-binary, text-metrics, time, tls, transformers, unicode-transforms, unix, unix-compat, unliftio, unordered-containers, vector, yaml, zip-archive, zlib }:
+      stack = callPackage ({ Cabal, aeson, annotated-wl-pprint, ansi-terminal, attoparsec, base, base64-bytestring, bindings-uname, blaze-builder, bytestring, clock, conduit, conduit-extra, containers, cryptonite, cryptonite-conduit, deepseq, directory, echo, exceptions, extra, fast-logger, fetchgit, file-embed, filelock, filepath, fsnotify, generic-deriving, gitrev, hackage-security, hashable, hastache, hpack, hpc, http-client, http-client-tls, http-conduit, http-types, memory, microlens, microlens-mtl, mintty, mkDerivation, monad-logger, mtl, network-uri, open-browser, optparse-applicative, optparse-simple, path, path-io, persistent, persistent-sqlite, persistent-template, pid1, pretty, primitive, process, project-template, regex-applicative-text, resourcet, retry, semigroups, split, stdenv, stm, store, store-core, streaming-commons, tar, template-haskell, text, text-metrics, time, tls, transformers, unicode-transforms, unix, unix-compat, unliftio, unordered-containers, vector, yaml, zip-archive, zlib }:
       mkDerivation {
           pname = "stack";
           version = "1.5.1";
           src = fetchgit {
             url = "https://github.com/commercialhaskell/stack.git";
-            sha256 = "1b1jcxzkg0w9d58ks940s373aj9izsrz61ynzqvx9vg3vllsj402";
-            rev = "279744b934513454d5a11bae870432432edb196a";
+            sha256 = "1plpdxlmfk3i0s89nwi24mbn9wnmaxwjcyrria4l2r1cnz656rz5";
+            rev = "aa5003a153504f54051e42a844a0c1c3d7f82163";
           };
           isLibrary = true;
           isExecutable = true;
@@ -3139,8 +3009,7 @@ self: {
             attoparsec
             base
             base64-bytestring
-            binary
-            binary-tagged
+            bindings-uname
             blaze-builder
             bytestring
             Cabal
@@ -3201,7 +3070,6 @@ self: {
             tar
             template-haskell
             text
-            text-binary
             text-metrics
             time
             tls
@@ -3251,7 +3119,7 @@ self: {
           description = "The Haskell Tool Stack";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      stack2nix = callPackage ({ Cabal, Glob, SafeSemaphore, async, base, bytestring, containers, data-fix, directory, filepath, hnix, mkDerivation, monad-parallel, optparse-applicative, path, pretty-show, process, stack, stdenv, temporary, text, yaml }:
+      stack2nix = callPackage ({ Cabal, Glob, SafeSemaphore, async, base, bytestring, containers, data-fix, directory, filepath, hnix, mkDerivation, monad-parallel, optparse-applicative, path, process, stack, stdenv, temporary, text, yaml }:
       mkDerivation {
           pname = "stack2nix";
           version = "0.1.3.0";
@@ -3272,7 +3140,6 @@ self: {
             monad-parallel
             optparse-applicative
             path
-            pretty-show
             process
             SafeSemaphore
             stack
@@ -3528,22 +3395,6 @@ self: {
           doCheck = false;
           homepage = "https://github.com/bos/text";
           description = "An efficient packed Unicode text type";
-          license = stdenv.lib.licenses.bsd2;
-        }) {};
-      text-binary = callPackage ({ base, binary, mkDerivation, stdenv, text }:
-      mkDerivation {
-          pname = "text-binary";
-          version = "0.2.1.1";
-          sha256 = "18gl10pwg3qwsk0za3c70j4n6a9129wwf1b7d3a461h816yv55xn";
-          libraryHaskellDepends = [
-            base
-            binary
-            text
-          ];
-          doHaddock = false;
-          doCheck = false;
-          homepage = "https://github.com/kawu/text-binary";
-          description = "Binary instances for text types";
           license = stdenv.lib.licenses.bsd2;
         }) {};
       text-metrics = callPackage ({ base, containers, mkDerivation, stdenv, text, vector }:
@@ -4029,21 +3880,6 @@ self: {
           doCheck = false;
           homepage = "http://code.haskell.org/~dolio/";
           description = "Efficient algorithms for vector arrays";
-          license = stdenv.lib.licenses.bsd3;
-        }) {};
-      vector-th-unbox = callPackage ({ base, mkDerivation, stdenv, template-haskell, vector }:
-      mkDerivation {
-          pname = "vector-th-unbox";
-          version = "0.2.1.6";
-          sha256 = "0d82x55f5vvr1jvaia382m23rs690lg55pvavv8f4ph0y6kd91xy";
-          libraryHaskellDepends = [
-            base
-            template-haskell
-            vector
-          ];
-          doHaddock = false;
-          doCheck = false;
-          description = "Deriver for Data.Vector.Unboxed using Template Haskell";
           license = stdenv.lib.licenses.bsd3;
         }) {};
       void = callPackage ({ base, mkDerivation, stdenv }:
