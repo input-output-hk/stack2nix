@@ -51,7 +51,6 @@ import           System.FilePath.Glob         (glob)
 import           System.IO                    (hPutStrLn, stderr)
 import           System.IO.Temp               (withSystemTempDirectory)
 import           Text.ParserCombinators.ReadP (readP_to_S)
-import           Text.Show.Pretty
 
 data Args = Args
   { argRev     :: Maybe String
@@ -127,12 +126,12 @@ toNix args@Args{..} remoteUri baseDir lc = withCurrentDirectory baseDir $ do
     let packages = filter (\p -> case p of
                                    PLIndex _          -> False
                                    PLOther (PLRepo _) -> True
-                                   _ -> error $ "Unsupported build config dependency: " ++ ppShow p) (bcDependencies bc)
+                                   _ -> error $ "Unsupported build config dependency: " ++ show p) (bcDependencies bc)
     runPlan baseDir outDir remoteUri (map toPackageRef packages) lc argRev argThreads $ patchAndMerge args baseDir bc outDir
   where
     toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
     toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo
-    toPackageRef p = error $ "Unsupported package location index: " ++ ppShow p
+    toPackageRef p = error $ "Unsupported package location index: " ++ show p
 
 patchAndMerge :: Args -> FilePath -> BuildConfig -> FilePath -> IO ()
 patchAndMerge Args{..} baseDir BuildConfig{..} outDir = do

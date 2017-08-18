@@ -40,7 +40,6 @@ import           System.Directory              (createDirectoryIfMissing,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               ((</>))
 import           System.IO                     (hPutStrLn, stderr)
-import           Text.Show.Pretty
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | CabalPackage PackageIdentifier
@@ -126,7 +125,7 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter
   plan <- withLoadPackage $ \loadPackage ->
     constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
   let pkgs = prioritize $ planToPackages plan ++ revPkgs
-  liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
+  -- liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
 
   void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir)) $ words "hscolour stringbuilder"
   void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev) pkgs
@@ -149,8 +148,8 @@ runPlan baseDir outDir remoteUri revPkgs lc argRev threads doAfter = do
   globals <- queryNixPkgsPaths Include pkgs >>= \includes ->
              queryNixPkgsPaths Lib pkgs >>= \libs ->
              pure $ globalOpts baseDir stackRoot includes libs threads
-  hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
-  hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
+  -- hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
+  -- hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
   withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev threads doAfter
 
 {-

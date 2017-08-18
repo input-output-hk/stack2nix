@@ -30,7 +30,6 @@ library
                      , monad-parallel >= 0.7.2.2 && < 0.8
                      , optparse-applicative >= 0.13.2 && < 0.14
                      , path
-                     , pretty-show
                      , process >= 1.4.3 && < 1.5
                      , SafeSemaphore >= 0.10.1 && < 0.11
                      , stack >= 0.5.1
