@@ -191,6 +191,7 @@ globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
                   , ["--jobs", show argThreads]
                   , ["--test" | argTest]
                   , ["--haddock" | argHaddock]
+                  , ["--nix"]
                   ]
     go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
 
