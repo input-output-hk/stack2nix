@@ -39,6 +39,7 @@ import           Stack2nix.External.Stack
 import           Stack2nix.External.Util      (runCmd, runCmdFrom)
 import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
                                                InternalCmd (..), git)
+import           Stack2nix.Types              (Args (..))
 import           Stack2nix.Util
 import           System.Directory             (canonicalizePath, doesFileExist,
                                                withCurrentDirectory)
@@ -51,16 +52,6 @@ import           System.FilePath.Glob         (glob)
 import           System.IO                    (hPutStrLn, stderr)
 import           System.IO.Temp               (withSystemTempDirectory)
 import           Text.ParserCombinators.ReadP (readP_to_S)
-
-data Args = Args
-  { argRev     :: Maybe String
-  , argOutFile :: Maybe FilePath
-  , argThreads :: Int
-  , argTest    :: Bool
-  , argHaddock :: Bool
-  , argUri     :: String
-  }
-  deriving (Show)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
@@ -127,7 +118,7 @@ toNix args@Args{..} remoteUri baseDir lc = withCurrentDirectory baseDir $ do
                                    PLIndex _          -> False
                                    PLOther (PLRepo _) -> True
                                    _ -> error $ "Unsupported build config dependency: " ++ show p) (bcDependencies bc)
-    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc argRev argThreads $ patchAndMerge args baseDir bc outDir
+    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc args $ patchAndMerge args baseDir bc outDir
   where
     toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
     toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo

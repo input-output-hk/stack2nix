@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
@@ -35,6 +36,7 @@ import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
                                                 packageIdentifierString)
 import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
+import           Stack2nix.Types               (Args (..))
 import           Stack2nix.Util                (mapPool)
 import           System.Directory              (createDirectoryIfMissing,
                                                 makeRelativeToCurrentDirectory)
@@ -136,21 +138,20 @@ runPlan :: FilePath
         -> Maybe String
         -> [PackageRef]
         -> LoadConfig
-        -> Maybe String
-        -> Int
+        -> Args
         -> IO ()
         -> IO ()
-runPlan baseDir outDir remoteUri revPkgs lc argRev threads doAfter = do
+runPlan baseDir outDir remoteUri revPkgs lc args@Args{..} doAfter = do
   let pkgsInConfig = nixPackages (configNix $ lcConfig lc)
   let pkgs = map unpack pkgsInConfig ++ ["ghc", "git"]
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
   globals <- queryNixPkgsPaths Include pkgs >>= \includes ->
              queryNixPkgsPaths Lib pkgs >>= \libs ->
-             pure $ globalOpts baseDir stackRoot includes libs threads
+             pure $ globalOpts baseDir stackRoot includes libs args
   -- hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
   -- hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev threads doAfter
+  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev argThreads doAfter
 
 {-
   TODO:
@@ -174,8 +175,8 @@ queryNixPkgsPaths kind pkgs = do
       query Lib     = "${lib.getLib pkg}/lib"
       query Include = "${lib.getDev pkg}/include"
 
-globalOpts :: FilePath -> FilePath -> Set FilePath -> Set FilePath -> Int -> GlobalOpts
-globalOpts currentDir stackRoot extraIncludes extraLibs threads =
+globalOpts :: FilePath -> FilePath -> Set FilePath -> Set FilePath -> Args -> GlobalOpts
+globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
   go { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
      , globalConfigMonoid =
          (globalConfigMonoid go)
@@ -185,7 +186,12 @@ globalOpts currentDir stackRoot extraIncludes extraLibs threads =
      }
   where
     pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
-    args = ["--work-dir", "./.s2n", "--stack-root", stackRoot, "--jobs", show threads, "--nix"]
+    args = concat [ ["--work-dir", "./.s2n"]
+                  , ["--stack-root", stackRoot]
+                  , ["--jobs", show argThreads]
+                  , ["--test" | argTest]
+                  , ["--haddock" | argHaddock]
+                  ]
     go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
 
 buildOpts :: BuildOptsCLI
