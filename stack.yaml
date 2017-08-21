@@ -4,12 +4,13 @@ packages:
 - '.'
 - location:
    git: https://github.com/commercialhaskell/stack.git
-   commit: 279744b934513454d5a11bae870432432edb196a
+   commit: aa5003a153504f54051e42a844a0c1c3d7f82163
   extra-dep: true
-
 
 extra-deps:
 - hnix-0.3.4
+- bindings-uname-0.1
+- Cabal-2.0.0.2
 
 flags: {}
 
