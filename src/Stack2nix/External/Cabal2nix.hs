@@ -36,6 +36,7 @@ cabal2nix uri commit subpath outDir = do
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , ["--subpath", dir]
+      , ["--system", "x86_64-linux"]
       , ["--no-check", "--no-haddock"]
       , [uri]
       ]

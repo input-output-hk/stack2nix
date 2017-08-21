@@ -1,6 +1,6 @@
 # stack2nix
 
-[![Build Status](https://travis-ci.org/input-output-hk/stack2nix.svg)](https://travis-ci.org/input-output-hk/stack2nix)
+[![Build Status](https://travis-ci.org/input-output-hk/stack2nix.svg?branch=master)](https://travis-ci.org/input-output-hk/stack2nix)
 
 ## About
 

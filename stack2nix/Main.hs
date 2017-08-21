@@ -4,6 +4,8 @@ import           Data.Semigroup      ((<>))
 import           Distribution.Text   (display)
 import           Options.Applicative
 import           Stack2nix
+import           System.IO           (BufferMode (..), hSetBuffering, stderr,
+                                      stdout)
 
 args :: Parser Args
 args = Args
@@ -15,7 +17,10 @@ args = Args
        <*> strArgument (metavar "URI")
 
 main :: IO ()
-main = stack2nix =<< execParser opts
+main = do
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stderr LineBuffering
+  stack2nix =<< execParser opts
   where
     opts = info
       (helper
