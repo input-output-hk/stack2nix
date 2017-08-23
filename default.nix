@@ -1,6 +1,6 @@
 { pkgs ? import <nixpkgs> {}}:
 
-with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; } ); 
+with pkgs.haskell.lib;
 
 ((import ./stack2nix.nix { inherit pkgs; }).override {
   overrides = self: super: {
