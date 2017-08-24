@@ -39,6 +39,7 @@ import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Types               (Args (..))
 import           Stack2nix.Util                (mapPool)
 import           System.Directory              (createDirectoryIfMissing,
+                                                getCurrentDirectory,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               ((</>))
 import           System.IO                     (hPutStrLn, stderr)
@@ -48,13 +49,14 @@ data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | RepoPackage (Repo Subdirs)
                 deriving (Eq, Show)
 
-genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> PackageRef -> IO ()
-genNixFile baseDir outDir uri argRev pkgRef = do
+genNixFile :: FilePath -> Maybe String -> Maybe String -> PackageRef -> IO ()
+genNixFile outDir uri argRev pkgRef = do
   hPutStrLn stderr $ "Generating nix expression for " ++ show pkgRef
   case pkgRef of
     LocalPackage _ident path mrev -> do
       relPath <- makeRelativeToCurrentDirectory path
-      void $ cabal2nix (fromMaybe (baseDir </> relPath) uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
+      currDir <- getCurrentDirectory
+      void $ cabal2nix (fromMaybe (currDir </> relPath) uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
     CabalPackage pkg ->
       void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
     RepoPackage repo ->
@@ -99,14 +101,13 @@ prioritize = reverse .
 planAndGenerate :: HasEnvConfig env
                 => BuildOptsCLI
                 -> FilePath
-                -> FilePath
                 -> Maybe String
                 -> [PackageRef]
                 -> Maybe String
                 -> Int
                 -> IO ()
                 -> RIO env ()
-planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter = do
+planAndGenerate boptsCli outDir remoteUri revPkgs argRev threads doAfter = do
   bopts <- view buildOptsL
   let profiling = boptsLibProfile bopts || boptsExeProfile bopts
   let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
@@ -130,34 +131,32 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter
   -- liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
 
   void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir)) $ words "hscolour stringbuilder"
-  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev) pkgs
+  void $ liftIO $ mapPool threads (genNixFile outDir remoteUri argRev) pkgs
   liftIO doAfter
 
 runPlan :: FilePath
-        -> FilePath
         -> Maybe String
         -> [PackageRef]
         -> LoadConfig
         -> Args
         -> IO ()
         -> IO ()
-runPlan baseDir outDir remoteUri revPkgs lc args@Args{..} doAfter = do
+runPlan outDir remoteUri revPkgs lc args@Args{..} doAfter = do
   let pkgsInConfig = nixPackages (configNix $ lcConfig lc)
   let pkgs = map unpack pkgsInConfig ++ ["ghc", "git"]
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
   globals <- queryNixPkgsPaths Include pkgs >>= \includes ->
              queryNixPkgsPaths Lib pkgs >>= \libs ->
-             pure $ globalOpts baseDir stackRoot includes libs args
+             pure $ globalOpts stackRoot includes libs args
   -- hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
   -- hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev argThreads doAfter
+  withBuildConfig globals $ planAndGenerate buildOpts outDir remoteUri revPkgs argRev argThreads doAfter
 
 {-
   TODO:
   - replace "ghc" in package list with value encoding compiler version
   - handle custom shell.nix  (see mshellFile in Stack.Nix.runShellAndExit)
-  - remove baseDir arguments; due to withCurrentDirectory it should always be PWD.
 -}
 
 data NixPkgPath = Lib
@@ -175,8 +174,8 @@ queryNixPkgsPaths kind pkgs = do
       query Lib     = "${lib.getLib pkg}/lib"
       query Include = "${lib.getDev pkg}/include"
 
-globalOpts :: FilePath -> FilePath -> Set FilePath -> Set FilePath -> Args -> GlobalOpts
-globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
+globalOpts :: FilePath -> Set FilePath -> Set FilePath -> Args -> GlobalOpts
+globalOpts stackRoot extraIncludes extraLibs Args{..} =
   go { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
      , globalConfigMonoid =
          (globalConfigMonoid go)
@@ -185,7 +184,7 @@ globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
          }
      }
   where
-    pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
+    pinfo = info (globalOptsParser "." OuterGlobalOpts (Just LevelError)) briefDesc
     args = concat [ ["--work-dir", "./.s2n"]
                   , ["--stack-root", stackRoot]
                   , ["--jobs", show argThreads]
