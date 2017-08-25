@@ -108,24 +108,24 @@ stack2nix args@Args{..} = do
       lc <- withRunner LevelError True False ColorAuto False $ \runner ->
         -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
         runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
-      toNix args remoteUri localDir lc
+      withCurrentDirectory localDir $ toNix args remoteUri lc
 
-toNix :: Args -> Maybe String -> FilePath -> LoadConfig -> IO ()
-toNix args@Args{..} remoteUri baseDir lc = withCurrentDirectory baseDir $ do
+toNix :: Args -> Maybe String -> LoadConfig -> IO ()
+toNix args@Args{..} remoteUri lc = do
   bc <- lcLoadBuildConfig lc Nothing -- compiler
   withSystemTempDirectory "s2n" $ \outDir -> do
     let packages = filter (\p -> case p of
                                    PLIndex _          -> False
                                    PLOther (PLRepo _) -> True
                                    _ -> error $ "Unsupported build config dependency: " ++ show p) (bcDependencies bc)
-    runPlan baseDir outDir remoteUri (map toPackageRef packages) lc args $ patchAndMerge args baseDir bc outDir
+    runPlan outDir remoteUri (map toPackageRef packages) lc args $ patchAndMerge args bc outDir
   where
     toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
     toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo
     toPackageRef p = error $ "Unsupported package location index: " ++ show p
 
-patchAndMerge :: Args -> FilePath -> BuildConfig -> FilePath -> IO ()
-patchAndMerge Args{..} baseDir BuildConfig{..} outDir = do
+patchAndMerge :: Args -> BuildConfig -> FilePath -> IO ()
+patchAndMerge Args{..} BuildConfig{..} outDir = do
   nixFiles <- glob (outDir </> "*.nix")
   overrides <- mapPool argThreads overrideFor nixFiles
   void $ mapPool argThreads patchNixFile nixFiles
@@ -142,17 +142,21 @@ patchAndMerge Args{..} baseDir BuildConfig{..} outDir = do
 
     -- Given a path to a package with Cabal file inside, return Cabal package name
     localPackageName :: FilePath -> IO String
-    localPackageName dir = do
-      [cabal] <- glob (dir </> "*.cabal")
-      contents <- readFile cabal
-      let nameLine = head [x | x <- lines contents, "name" `isInfixOf` map toLower x]
-      pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
+    localPackageName dir =
+      glob (dir </> "*.cabal") >>= \cabalFiles ->
+      case cabalFiles of
+        [cabal] -> do
+          contents <- readFile cabal
+          let nameLine = head [x | x <- lines contents, "name" `isInfixOf` map toLower x]
+          pure . reverse . takeWhile (/= ' ') . reverse $ nameLine
+        _ ->
+          error $ "expected exactly 1 cabal file in '" ++ dir ++ "'; found: " ++ show cabalFiles
 
     -- Returns a list of names of local packages
     localPackages :: IO [String]
     localPackages =
       mapM (\p -> case p of
-                    PLFilePath subDir -> localPackageName (baseDir </> subDir)
+                    PLFilePath subDir -> localPackageName subDir
                     PLArchive _ -> error "Arhive local dependencies not supported"
                     PLRepo _ -> error "Repo local dependencies not supported") bcPackages
 
