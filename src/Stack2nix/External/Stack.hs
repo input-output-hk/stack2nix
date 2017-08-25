@@ -39,7 +39,6 @@ import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Types               (Args (..))
 import           Stack2nix.Util                (mapPool)
 import           System.Directory              (createDirectoryIfMissing,
-                                                getCurrentDirectory,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               ((</>))
 import           System.IO                     (hPutStrLn, stderr)
@@ -55,8 +54,7 @@ genNixFile outDir uri argRev pkgRef = do
   case pkgRef of
     LocalPackage _ident path mrev -> do
       relPath <- makeRelativeToCurrentDirectory path
-      currDir <- getCurrentDirectory
-      void $ cabal2nix (fromMaybe (currDir </> relPath) uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
+      void $ cabal2nix (fromMaybe relPath uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
     CabalPackage pkg ->
       void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
     RepoPackage repo ->
