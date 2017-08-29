@@ -15,7 +15,7 @@ import           Data.Fix                     (Fix (..))
 import           Data.List                    (foldl', isInfixOf, isSuffixOf,
                                                sort, union, (\\))
 import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (listToMaybe)
+import           Data.Maybe                   (isJust, listToMaybe)
 import           Data.Monoid                  ((<>))
 import           Data.Text                    (Text, unpack)
 import           Data.Version                 (Version (..), parseVersion,
@@ -42,6 +42,7 @@ import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
 import           Stack2nix.Types              (Args (..))
 import           Stack2nix.Util
 import           System.Directory             (canonicalizePath, doesFileExist,
+                                               getCurrentDirectory,
                                                withCurrentDirectory)
 import           System.Environment           (getEnv)
 import           System.Exit                  (ExitCode (..))
@@ -57,9 +58,15 @@ stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
   checkRuntimeDeps
   updateCabalPackageIndex
-  isLocalRepo <- doesFileExist $ argUri </> "stack.yaml"
+  -- cwd <- getCurrentDirectory
+  -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
+  let projRoot = argUri
+  isLocalRepo <- doesFileExist $ projRoot </> "stack.yaml"
+  -- hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
+  -- hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
+  -- hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
   if isLocalRepo
-  then handleStackConfig Nothing argUri
+  then handleStackConfig Nothing projRoot
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
@@ -100,18 +107,24 @@ stack2nix args@Args{..} = do
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
+      cwd <- getCurrentDirectory
+      -- hPutStrLn stderr $ "handleStackConfig (cwd): " ++ cwd
+      -- hPutStrLn stderr $ "handleStackConfig (localDir): " ++ localDir
+      -- hPutStrLn stderr $ "handleStackConfig (remoteUri): " ++ show remoteUri
       let stackFile = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
+      -- hPutStrLn stderr $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
       cp <- canonicalizePath stackFile
       fp <- parseAbsFile cp
       lc <- withRunner LevelError True False ColorAuto False $ \runner ->
         -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
         runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
-      toNix args remoteUri localDir lc
+      if isJust remoteUri then withCurrentDirectory localDir (toNix args remoteUri localDir lc) else toNix args remoteUri localDir lc
+
 
 toNix :: Args -> Maybe String -> FilePath -> LoadConfig -> IO ()
-toNix args@Args{..} remoteUri baseDir lc = withCurrentDirectory baseDir $ do
+toNix args@Args{..} remoteUri baseDir lc = do
   bc <- lcLoadBuildConfig lc Nothing -- compiler
   withSystemTempDirectory "s2n" $ \outDir -> do
     let packages = filter (\p -> case p of
