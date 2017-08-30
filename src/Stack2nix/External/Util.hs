@@ -3,11 +3,13 @@ module Stack2nix.External.Util where
 import           Data.Monoid      ((<>))
 import           System.Directory (getCurrentDirectory)
 import           System.Exit      (ExitCode (..))
+import           System.IO        (hPutStrLn, stderr)
 import           System.Process   (CreateProcess (..), proc,
                                    readCreateProcessWithExitCode)
 
 runCmdFrom :: FilePath -> String -> [String] -> IO (ExitCode, String, String)
-runCmdFrom dir prog args =
+runCmdFrom dir prog args = do
+  -- hPutStrLn stderr $ "runCmdFrom (" ++ dir ++ "): " ++ prog ++ " " ++ show args
   readCreateProcessWithExitCode (fromDir dir (proc prog args)) ""
   where
     fromDir :: FilePath -> CreateProcess -> CreateProcess

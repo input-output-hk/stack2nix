@@ -6,7 +6,8 @@ module Stack2nix.External.Stack
   ) where
 
 import           Control.Applicative           ((<|>))
-import           Data.List                     (nubBy, sortBy)
+import           Control.Monad                 (unless)
+import           Data.List                     (isInfixOf, nubBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
 import qualified Data.Set                      as S
@@ -38,9 +39,11 @@ import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Types               (Args (..))
 import           Stack2nix.Util                (mapPool)
-import           System.Directory              (createDirectoryIfMissing,
+import           System.Directory              (canonicalizePath,
+                                                createDirectoryIfMissing,
+                                                getCurrentDirectory,
                                                 makeRelativeToCurrentDirectory)
-import           System.FilePath               ((</>))
+import           System.FilePath               (makeRelative, (</>))
 import           System.IO                     (hPutStrLn, stderr)
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
@@ -50,11 +53,23 @@ data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
 
 genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> PackageRef -> IO ()
 genNixFile baseDir outDir uri argRev pkgRef = do
-  hPutStrLn stderr $ "Generating nix expression for " ++ show pkgRef
+  cwd <- getCurrentDirectory
+  -- hPutStrLn stderr $ "\nGenerating nix expression for " ++ show pkgRef
+  -- hPutStrLn stderr $ "genNixFile (cwd): " ++ cwd
+  -- hPutStrLn stderr $ "genNixFile (baseDir): " ++ baseDir
+  -- hPutStrLn stderr $ "genNixFile (outDir): " ++ outDir
+  -- hPutStrLn stderr $ "genNixFile (uri): " ++ show uri
+  -- hPutStrLn stderr $ "genNixFile (pkgRef): " ++ show pkgRef
   case pkgRef of
     LocalPackage _ident path mrev -> do
       relPath <- makeRelativeToCurrentDirectory path
-      void $ cabal2nix (fromMaybe (baseDir </> relPath) uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
+      -- hPutStrLn stderr $ "genNixFile (LocalPackage: relPath): " ++ relPath
+      projRoot <- canonicalizePath $ cwd </> baseDir
+      -- hPutStrLn stderr $ "genNixFile (LocalPackage: projRoot): " ++ projRoot
+      let defDir = baseDir </> makeRelative projRoot path
+      -- hPutStrLn stderr $ "genNixFile (LocalPackage: defDir): " ++ defDir
+      unless (".s2n" `isInfixOf` path) $
+        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
     CabalPackage pkg ->
       void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
     RepoPackage repo ->
