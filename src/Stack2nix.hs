@@ -83,7 +83,8 @@ stack2nix args@Args{..} = do
             -- heuristic for parsing version from stdout
             firstLine = head . lines
             lastWord = last . words
-            ver = parseVer . lastWord . firstLine $ out
+            onlyVersion = filter (\x -> x `elem` ['.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+            ver = parseVer . onlyVersion . firstLine $ out
           in
           unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
         (ExitFailure _, _, err)  -> error err
