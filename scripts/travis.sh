@@ -2,7 +2,10 @@
 #! nix-shell -p cabal2nix stack nix-prefetch-git git cabal-install ghc -i bash
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/a905b7cd0c2dc0714195a50bf176cd8e4593502d.tar.gz
 
-export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/a905b7cd0c2dc0714195a50bf176cd8e4593502d.tar.gz
+readlink=$(nix-instantiate --eval -E "/. + (import <nix/config.nix>).coreutils")/readlink
+scriptDir=$(dirname -- "$($readlink -f -- "${BASH_SOURCE[0]}")")
+export NIX_PATH="nixpkgs=$(nix-build "${scriptDir}/../fetch-nixpkgs.nix" --no-out-link)"
+
 
 set -ex
 

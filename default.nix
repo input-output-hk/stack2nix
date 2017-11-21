@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {}}:
+{ pkgs ? import (import ./fetch-nixpkgs.nix) {} }:
 
 with pkgs.haskell.lib;
 
