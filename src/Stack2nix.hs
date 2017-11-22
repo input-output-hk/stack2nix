@@ -64,14 +64,12 @@ stack2nix args@Args{..} = do
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
   let projRoot = argUri
   isLocalRepo <- doesFileExist $ projRoot </> "stack.yaml"
-  hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
-  hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
-  hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
-  putStrLn "Checking if local or remote repository..."
+  --  hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
+  --  hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
+  --  hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
   if isLocalRepo
   then handleStackConfig Nothing projRoot
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
-    putStrLn "Handling git..."
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
     parseVer :: String -> Maybe Version
