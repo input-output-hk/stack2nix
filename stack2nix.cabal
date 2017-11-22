@@ -1,5 +1,5 @@
 name:                stack2nix
-version:             0.1.3.0
+version:             0.1.3.1
 synopsis:            Convert stack.yaml files into Nix build instructions.
 description:         Convert stack.yaml files into Nix build instructions.
 license:             MIT
@@ -36,6 +36,7 @@ library
                      , temporary >= 1.2.0.4 && < 1.3
                      , text >= 1.2.2.1 && < 1.3
                      , yaml >= 0.8.22.1 && < 0.9
+                     , time
   exposed-modules:     Stack2nix
                      , Stack2nix.Types
   other-modules:       Stack2nix.External
@@ -55,6 +56,7 @@ executable stack2nix
                      , Cabal >= 2.0.0.2 && < 2.1
                      , stack2nix
                      , optparse-applicative >= 0.13.2 && < 0.14
+                     , time
   hs-source-dirs:      stack2nix
   ghc-options:         -Wall
   default-language:    Haskell2010

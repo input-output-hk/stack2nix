@@ -6,15 +6,18 @@ import           Data.List               (stripPrefix, takeWhile)
 import           Data.Maybe              (fromMaybe)
 import           Data.Monoid             ((<>))
 import           Data.Text               (Text, unpack)
+import           Data.Time               (UTCTime, formatTime, defaultTimeLocale)
 import           Stack2nix.External.Util (runCmd)
 import           System.Exit             (ExitCode (..))
 import           System.FilePath         ((</>))
 import           System.IO               (hPutStrLn, stderr)
 
--- Requires cabal2nix >= 2.2 in PATH
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO (ExitCode, String, String)
-cabal2nix uri commit subpath outDir = do
-  result <- runCmd exe (args $ fromMaybe "." subpath)
+-- Requires cabal2nix >= 2.7 in PATH
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> Maybe UTCTime -> IO (ExitCode, String, String)
+cabal2nix uri commit subpath outDir hSnapshot = do
+  let runCmdArgs = args $ fromMaybe "." subpath
+  putStrLn $ unwords runCmdArgs
+  result <- runCmd exe runCmdArgs
   case result of
     (ExitSuccess, stdout, _) ->
       let basename = pname stdout <> ".nix"
@@ -32,14 +35,19 @@ cabal2nix uri commit subpath outDir = do
   where
     exe = "cabal2nix"
 
+    -- | TODO(ks): Maybe a more specific error if a parameter fails, since `--hackage-snapshot` is on cabal2nix >= 2.7
     args :: FilePath -> [String]
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , ["--subpath", dir]
       , ["--system", "x86_64-linux"]
       , ["--no-check", "--no-haddock"]
+      , maybe [] (\snapshot -> ["--hackage-snapshot", iso8601 snapshot]) hSnapshot
       , [uri]
       ]
+
+    iso8601 :: UTCTime -> String
+    iso8601 = formatTime defaultTimeLocale "%FT%T%QZ"
 
     pname :: String -> String
     pname = pname' . lines

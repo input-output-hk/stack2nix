@@ -56,18 +56,22 @@ import           Text.ParserCombinators.ReadP (readP_to_S)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
+  putStrLn "Checking runtime dependencies..."
   checkRuntimeDeps
+  putStrLn "Updating cabal package index..."
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
   let projRoot = argUri
   isLocalRepo <- doesFileExist $ projRoot </> "stack.yaml"
-  -- hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
-  -- hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
-  -- hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
+  hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
+  hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
+  hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
+  putStrLn "Checking if local or remote repository..."
   if isLocalRepo
   then handleStackConfig Nothing projRoot
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
+    putStrLn "Handling git..."
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
     parseVer :: String -> Maybe Version
@@ -91,7 +95,7 @@ stack2nix args@Args{..} = do
 
     checkRuntimeDeps :: IO ()
     checkRuntimeDeps = do
-      checkVer "cabal2nix" "2.2.1"
+      checkVer "cabal2nix" "2.7"
       checkVer "git" "2"
       checkVer "cabal" "1"
 
