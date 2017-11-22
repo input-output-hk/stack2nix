@@ -56,9 +56,7 @@ import           Text.ParserCombinators.ReadP (readP_to_S)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
-  putStrLn "Checking runtime dependencies..."
   checkRuntimeDeps
-  putStrLn "Updating cabal package index..."
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
