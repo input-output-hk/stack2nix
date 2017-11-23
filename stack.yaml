@@ -15,6 +15,6 @@ extra-deps:
 flags: {}
 
 nix:
-  packages: [zlib,gmp,git]
+  packages: [zlib,gmp,git,pcre]
 
 extra-package-dbs: []

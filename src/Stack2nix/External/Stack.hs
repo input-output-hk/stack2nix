@@ -45,7 +45,6 @@ import           System.Directory              (canonicalizePath,
                                                 getCurrentDirectory,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               (makeRelative, (</>))
-import           System.IO                     (hPutStrLn, stderr)
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | CabalPackage PackageIdentifier

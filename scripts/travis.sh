@@ -18,6 +18,7 @@ cabal2nix --version
 # build and install
 stack --nix --system-ghc setup
 stack --nix --system-ghc install --fast
+stack --nix --system-ghc test
 
 # SMOKE TESTS
 

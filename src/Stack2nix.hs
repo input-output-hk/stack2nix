@@ -8,51 +8,44 @@ module Stack2nix
   , version
   ) where
 
-import           Control.Exception            (onException)
-import           Control.Monad                (unless, void)
-import           Data.Char                    (toLower)
-import           Data.Fix                     (Fix (..))
-import           Data.List                    (foldl', isInfixOf, isSuffixOf,
-                                               sort, union, (\\))
-import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (isJust, listToMaybe)
-import           Data.Monoid                  ((<>))
-import           Data.Text                    (Text, unpack)
-import           Data.Version                 (Version (..), parseVersion,
-                                               showVersion)
-import           Distribution.Text            (display)
-import           Nix.Atoms                    (NAtom (..))
-import           Nix.Expr                     (Binding (..), NExpr, NExprF (..),
-                                               NKeyName (..), ParamSet (..),
-                                               Params (..))
-import           Nix.Parser                   (Result (..), parseNixFile,
-                                               parseNixString)
-import           Nix.Pretty                   (prettyNix)
-import           Path                         (parseAbsFile)
-import           Paths_stack2nix              (version)
+import           Control.Monad              (unless, void)
+import           Data.Char                  (toLower)
+import           Data.Fix                   (Fix (..))
+import           Data.List                  (foldl', isInfixOf, isSuffixOf,
+                                             sort, union, (\\))
+import qualified Data.Map.Strict            as Map
+import           Data.Maybe                 (isJust)
+import           Data.Monoid                ((<>))
+import           Data.Text                  (Text, unpack)
+import           Distribution.Text          (display)
+import           Nix.Atoms                  (NAtom (..))
+import           Nix.Expr                   (Binding (..), NExpr, NExprF (..),
+                                             NKeyName (..), ParamSet (..),
+                                             Params (..))
+import           Nix.Parser                 (Result (..), parseNixFile,
+                                             parseNixString)
+import           Nix.Pretty                 (prettyNix)
+import           Path                       (parseAbsFile)
+import           Paths_stack2nix            (version)
 import           Stack.Config
-import           Stack.Prelude                (LogLevel (..), runRIO)
+import           Stack.Prelude              (LogLevel (..), runRIO)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Runner
 import           Stack2nix.External.Stack
-import           Stack2nix.External.Util      (runCmd, runCmdFrom)
-import           Stack2nix.External.VCS.Git   (Command (..), ExternalCmd (..),
-                                               InternalCmd (..), git)
-import           Stack2nix.Types              (Args (..))
+import           Stack2nix.External.Util    (runCmdFrom)
+import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
+                                             InternalCmd (..), git)
+import           Stack2nix.Types            (Args (..))
 import           Stack2nix.Util
-import           System.Directory             (canonicalizePath, doesFileExist,
-                                               getCurrentDirectory,
-                                               withCurrentDirectory)
-import           System.Environment           (getEnv)
-import           System.Exit                  (ExitCode (..))
-import           System.FilePath              (dropExtension, isAbsolute,
-                                               normalise, takeDirectory,
-                                               takeFileName, (<.>), (</>))
-import           System.FilePath.Glob         (glob)
-import           System.IO                    (hPutStrLn, stderr)
-import           System.IO.Temp               (withSystemTempDirectory)
-import           Text.ParserCombinators.ReadP (readP_to_S)
+import           System.Directory           (canonicalizePath, doesFileExist,
+                                             withCurrentDirectory)
+import           System.Environment         (getEnv)
+import           System.FilePath            (dropExtension, isAbsolute,
+                                             normalise, takeDirectory,
+                                             takeFileName, (<.>), (</>))
+import           System.FilePath.Glob       (glob)
+import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
@@ -70,30 +63,11 @@ stack2nix args@Args{..} = do
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
-    parseVer :: String -> Maybe Version
-    parseVer =
-      fmap fst . listToMaybe . reverse . readP_to_S parseVersion
-
-    checkVer prog minVer = do
-      hPutStrLn stderr $ unwords ["Ensuring", prog, "version is >=", minVer, "..."]
-      result <- runCmd prog ["--version"] `onException` error ("Failed to run " ++ prog ++ ". Not found in PATH.")
-      case result of
-        (ExitSuccess, out, _) ->
-          let
-            -- heuristic for parsing version from stdout
-            firstLine = head . lines
-            lastWord = last . words
-            onlyVersion = filter (\x -> x `elem` ['.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
-            ver = parseVer . onlyVersion . firstLine $ out
-          in
-          unless (ver >= parseVer minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
-        (ExitFailure _, _, err)  -> error err
-
     checkRuntimeDeps :: IO ()
     checkRuntimeDeps = do
-      checkVer "cabal2nix" "2.7"
-      checkVer "git" "2"
-      checkVer "cabal" "1"
+      assertMinVer "cabal2nix" "2.7"
+      assertMinVer "git" "2"
+      assertMinVer "cabal" "2"
 
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex =
@@ -108,7 +82,7 @@ stack2nix args@Args{..} = do
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
-      cwd <- getCurrentDirectory
+      -- cwd <- getCurrentDirectory
       -- hPutStrLn stderr $ "handleStackConfig (cwd): " ++ cwd
       -- hPutStrLn stderr $ "handleStackConfig (localDir): " ++ localDir
       -- hPutStrLn stderr $ "handleStackConfig (remoteUri): " ++ show remoteUri
