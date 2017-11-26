@@ -19,11 +19,14 @@ library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
                      , Cabal >= 2.0.0.2 && < 2.1
+                     , ansi-wl-pprint >= 0.6.7.3 && < 0.7
                      , async >= 2.1.1.1 && < 2.2
                      , bytestring >= 0.10.8.1 && < 0.11
+                     , cabal2nix >= 2.7 && < 2.8
                      , containers >= 0.5.7.1 && < 0.6
                      , data-fix >= 0.0.4
                      , directory >= 1.3 && < 1.4
+                     , distribution-nixpkgs >= 1.1 && < 1.2
                      , filepath >= 1.4.1.1 && < 1.5
                      , Glob >= 0.7.14 && < 0.9
                      , hnix >= 0.3.4 && < 0.4
@@ -31,6 +34,7 @@ library
                      , optparse-applicative >= 0.13.2 && < 0.14
                      , path
                      , process >= 1.4.3 && < 1.5
+                     , pretty-show >= 1.6.13 && < 1.7
                      , regex-pcre >= 0.94.4 && < 0.95
                      , SafeSemaphore >= 0.10.1 && < 0.11
                      , stack >= 0.5.1

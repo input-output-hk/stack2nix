@@ -65,9 +65,8 @@ stack2nix args@Args{..} = do
   where
     checkRuntimeDeps :: IO ()
     checkRuntimeDeps = do
-      assertMinVer "cabal2nix" "2.7"
       assertMinVer "git" "2"
-      assertMinVer "cabal" "2"
+      -- assertMinVer "cabal" "2"
 
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex =

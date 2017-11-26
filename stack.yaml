@@ -11,10 +11,12 @@ extra-deps:
 - hnix-0.3.4
 - bindings-uname-0.1
 - Cabal-2.0.0.2
+- cabal2nix-2.7
+- hackage-db-2.0
 
 flags: {}
 
 nix:
-  packages: [zlib,gmp,git,pcre]
+  packages: [zlib,gmp,git,pcre,openssl,haskellPackages.happy]
 
 extra-package-dbs: []

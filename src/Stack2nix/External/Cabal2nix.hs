@@ -2,40 +2,37 @@ module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
 
-import           Data.List               (stripPrefix, takeWhile)
-import           Data.Maybe              (fromMaybe)
-import           Data.Monoid             ((<>))
-import           Data.Text               (Text, unpack)
-import           Data.Time               (UTCTime, formatTime, defaultTimeLocale)
-import           Stack2nix.External.Util (runCmd)
-import           System.Exit             (ExitCode (..))
-import           System.FilePath         ((</>))
-import           System.IO               (hPutStrLn, stderr)
+import           Cabal2nix                   (cabal2nix')
+import           Data.List                   (stripPrefix, takeWhile)
+import           Data.Maybe                  (fromMaybe)
+import           Data.Monoid                 ((<>))
+import           Data.Text                   (Text, unpack)
+import           Data.Time                   (UTCTime, defaultTimeLocale,
+                                              formatTime)
+import           Language.Nix.PrettyPrinting (pPrint)
+import           System.FilePath             ((</>))
+import           System.IO                   (hPutStrLn, stderr)
 
--- Requires cabal2nix >= 2.7 in PATH
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> Maybe UTCTime -> IO (ExitCode, String, String)
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> Maybe UTCTime -> IO ()
 cabal2nix uri commit subpath outDir hSnapshot = do
   let runCmdArgs = args $ fromMaybe "." subpath
-  putStrLn $ unwords runCmdArgs
-  result <- runCmd exe runCmdArgs
+  hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
+  result <- cabal2nix' runCmdArgs
   case result of
-    (ExitSuccess, stdout, _) ->
-      let basename = pname stdout <> ".nix"
+    Right deriv ->
+      let out = show $ pPrint deriv
+          basename = pname out <> ".nix"
           fname = maybe basename (</> basename) outDir
       in
-      writeFile fname stdout >> return result
-    (_, _, err) -> do
+      writeFile fname out
+    Left err ->
       hPutStrLn stderr $ unwords [ "ERROR: cabal2nix failed on"
                                  , uri
                                  , "(rev: " ++ show commit ++ ";"
                                  , "subpath: " ++ show subpath ++ "):"
-                                 , "\n" ++ err
+                                 , "\n" ++ show err
                                  ]
-      return result
   where
-    exe = "cabal2nix"
-
-    -- | TODO(ks): Maybe a more specific error if a parameter fails, since `--hackage-snapshot` is on cabal2nix >= 2.7
     args :: FilePath -> [String]
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
