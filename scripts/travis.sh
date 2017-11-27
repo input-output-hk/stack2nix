@@ -2,18 +2,7 @@
 
 readlink=$(nix-instantiate --eval -E "/. + (import <nix/config.nix>).coreutils")/readlink
 scriptDir=$(dirname -- "$($readlink -f -- "${BASH_SOURCE[0]}")")
-NIXPKGS=$(nix-build "${scriptDir}/../fetch-nixpkgs.nix" --no-out-link)
-export NIX_PATH="nixpkgs=$NIXPKGS"
-
-
-set -ex
-
-STACK=$(nix-build -A stack $NIXPKGS)/bin
-NIX_PREFETCH=$(nix-build -A nix-prefetch-git $NIXPKGS)/bin
-GIT=$(nix-build -A git $NIXPKGS)/bin
-CABAL_INSTALL=$(nix-build -A cabal-install $NIXPKGS)/bin
-# set up local environment
-PATH="$HOME/.local/bin:$STACK:$NIX_PREFETCH:$GIT:$CABAL_INSTALL:$PATH"
+source $scriptDir/init-env.sh
 
 # build and install
 stack --nix --system-ghc install --fast --ghc-options="+RTS -A128m -n2m -RTS"
