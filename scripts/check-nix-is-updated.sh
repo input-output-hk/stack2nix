@@ -11,7 +11,6 @@ fail_stack2nix_check() {
   exit 1
 }
 
-~/.local/bin/stack2nix . > $scriptDir/../stack2nix.nix
+\time ~/.local/bin/stack2nix . > $scriptDir/../stack2nix.nix
 
 git diff --text --exit-code || fail_stack2nix_check
-
