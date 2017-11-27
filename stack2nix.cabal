@@ -19,9 +19,7 @@ library
   hs-source-dirs:      src
   build-depends:       base >=4.9 && <4.10
                      , Cabal >= 2.0.0.2 && < 2.1
-                     , ansi-wl-pprint >= 0.6.7.3 && < 0.7
                      , async >= 2.1.1.1 && < 2.2
-                     , bytestring >= 0.10.8.1 && < 0.11
                      , cabal2nix >= 2.7 && < 2.8
                      , containers >= 0.5.7.1 && < 0.6
                      , data-fix >= 0.0.4
@@ -30,25 +28,20 @@ library
                      , filepath >= 1.4.1.1 && < 1.5
                      , Glob >= 0.7.14 && < 0.9
                      , hnix >= 0.3.4 && < 0.4
-                     , monad-parallel >= 0.7.2.2 && < 0.8
                      , optparse-applicative >= 0.13.2 && < 0.14
                      , path
                      , process >= 1.4.3 && < 1.5
-                     , pretty-show >= 1.6.13 && < 1.7
                      , regex-pcre >= 0.94.4 && < 0.95
                      , SafeSemaphore >= 0.10.1 && < 0.11
-                     , stack >= 0.5.1
+                     , stack >= 1.5.1
                      , temporary >= 1.2.0.4 && < 1.3
                      , text >= 1.2.2.1 && < 1.3
-                     , yaml >= 0.8.22.1 && < 0.9
                      , time
   exposed-modules:     Stack2nix
                      , Stack2nix.Types
                      , Stack2nix.Util
-  other-modules:       Stack2nix.External
-                     , Stack2nix.External.Cabal2nix
+  other-modules:       Stack2nix.External.Cabal2nix
                      , Stack2nix.External.Stack
-                     , Stack2nix.External.VCS
                      , Stack2nix.External.VCS.Git
                      , Stack2nix.External.Util
                      , Paths_stack2nix

@@ -46,7 +46,6 @@ import           System.Directory              (canonicalizePath,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               (makeRelative, (</>))
 import           System.IO                     (hPutStrLn, stderr)
-import           Text.Show.Pretty              (ppShow)
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | CabalPackage PackageIdentifier
@@ -145,7 +144,7 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev hSnapshot threa
   plan <- withLoadPackage $ \loadPackage ->
     constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
   let pkgs = prioritize $ planToPackages plan ++ revPkgs
-  liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
+  liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
   void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hSnapshot) $ words "hscolour stringbuilder"
   void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hSnapshot) pkgs

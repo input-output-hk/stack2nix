@@ -91,7 +91,7 @@ stack2nix args@Args{..} = do
       -- hPutStrLn stderr $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
       cp <- canonicalizePath stackFile
       fp <- parseAbsFile cp
-      lc <- withRunner LevelError True False ColorAuto False $ \runner ->
+      lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->
         -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
         runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
       if isJust remoteUri then withCurrentDirectory localDir (toNix args remoteUri localDir lc) else toNix args remoteUri localDir lc
