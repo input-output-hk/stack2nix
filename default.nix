@@ -8,6 +8,7 @@ with pkgs.haskell.lib;
 
     # https://github.com/input-output-hk/stack2nix/issues/51
     Cabal = pkgs.haskell.packages.ghc802.Cabal_2_0_0_2;
+    Cabal_2_0_0_2 = pkgs.haskell.packages.ghc802.Cabal_2_0_0_2;
 
     # https://github.com/NixOS/cabal2nix/issues/146
     hinotify = if pkgs.stdenv.isDarwin then self.hfsevents else super.hinotify;
