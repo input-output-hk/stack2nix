@@ -158,7 +158,7 @@ toNix Args{..} remoteUri baseDir BuildConfig{..} =
           case result of
             (ExitSuccess, pkgs, _) -> do
               -- TODO: filter out pkgs that are part of bcPackages/bcDependencies
-              let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
+              let pkgs' = ["hscolour-1.24.2", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
               mapM_ (hPutStrLn stderr) pkgs'
               mapPool argThreads (curry handleStackDep outDir) (pack <$> pkgs') >>= mapM_ (handleStackDepResult 1)
