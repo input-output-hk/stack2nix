@@ -205,7 +205,7 @@ toNix Args{..} remoteUri baseDir StackConfig{..} =
           result <- runCmdFrom baseDir "stack" ["list-dependencies", "--system-ghc", "--test", "--separator", "-"]
           case result of
             (ExitSuccess, pkgs, _) -> do
-              let pkgs' = ["hscolour", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
+              let pkgs' = ["hscolour-1.24.2", "jailbreak-cabal", "cabal-doctest", "happy", "stringbuilder"] ++ lines pkgs
               hPutStrLn stderr "Haskell dependencies:"
               mapM_ (hPutStrLn stderr) pkgs'
               mapPool argThreads (curry handleStackDep outDir) (pack <$> pkgs') >>= mapM_ (handleStackDepResult 1)
