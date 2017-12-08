@@ -2,22 +2,21 @@ module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
 
-import           Cabal2nix                   (cabal2nix')
+import           Cabal2nix                   (cabal2nixWithDB)
 import           Data.List                   (stripPrefix, takeWhile)
 import           Data.Maybe                  (fromMaybe)
 import           Data.Monoid                 ((<>))
 import           Data.Text                   (Text, unpack)
-import           Data.Time                   (UTCTime, defaultTimeLocale,
-                                              formatTime)
 import           Language.Nix.PrettyPrinting (pPrint)
 import           System.FilePath             ((</>))
 import           System.IO                   (hPutStrLn, stderr)
+import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> Maybe UTCTime -> IO ()
-cabal2nix uri commit subpath outDir hSnapshot = do
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> DB.HackageDB -> IO ()
+cabal2nix uri commit subpath outDir hackageDB = do
   let runCmdArgs = args $ fromMaybe "." subpath
   hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
-  result <- cabal2nix' runCmdArgs
+  result <- cabal2nixWithDB hackageDB runCmdArgs
   case result of
     Right deriv ->
       let out = show $ pPrint deriv
@@ -39,12 +38,8 @@ cabal2nix uri commit subpath outDir hSnapshot = do
       , ["--subpath", dir]
       , ["--system", "x86_64-linux"]
       , ["--no-check", "--no-haddock"]
-      , maybe [] (\snapshot -> ["--hackage-snapshot", iso8601 snapshot]) hSnapshot
       , [uri]
       ]
-
-    iso8601 :: UTCTime -> String
-    iso8601 = formatTime defaultTimeLocale "%FT%T%QZ"
 
     pname :: String -> String
     pname = pname' . lines

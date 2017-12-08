@@ -46,14 +46,16 @@ import           System.Directory              (canonicalizePath,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               (makeRelative, (</>))
 import           System.IO                     (hPutStrLn, stderr)
+import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
+import Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | CabalPackage PackageIdentifier
                 | RepoPackage (Repo Subdirs)
                 deriving (Eq, Show)
 
-genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> Maybe UTCTime -> PackageRef  -> IO ()
-genNixFile baseDir outDir uri argRev hSnapshot pkgRef = do
+genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO ()
+genNixFile baseDir outDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   -- hPutStrLn stderr $ "\nGenerating nix expression for " ++ show pkgRef
   -- hPutStrLn stderr $ "genNixFile (cwd): " ++ cwd
@@ -70,15 +72,15 @@ genNixFile baseDir outDir uri argRev hSnapshot pkgRef = do
       let defDir = baseDir </> makeRelative projRoot path
       -- hPutStrLn stderr $ "genNixFile (LocalPackage: defDir): " ++ defDir
       unless (".s2n" `isInfixOf` path) $
-        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir) hSnapshot
+        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir) hackageDB
     CabalPackage pkg ->
-      void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir) hSnapshot
+      void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir) hackageDB
     RepoPackage repo ->
       case repoSubdirs repo of
         ExplicitSubdirs sds ->
-          mapM_ (\sd -> cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir) hSnapshot) sds
+          mapM_ (\sd -> cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir) hackageDB) sds
         DefaultSubdirs ->
-          void $ cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir) hSnapshot
+          void $ cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir) hackageDB
 
 planToPackages :: Plan -> [PackageRef]
 planToPackages plan = concatMap taskToPackages $ M.elems $ planTasks plan
@@ -146,8 +148,9 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev hSnapshot threa
   let pkgs = prioritize $ planToPackages plan ++ revPkgs
   liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
-  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hSnapshot) $ words "hscolour stringbuilder"
-  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hSnapshot) pkgs
+  hackageDB <- liftIO $ loadHackageDB Nothing hSnapshot
+  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hackageDB) $ words "hscolour stringbuilder"
+  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
   liftIO doAfter
 
 runPlan :: FilePath
