@@ -3,7 +3,7 @@ module Stack2nix.External.VCS.Git
   , git
   ) where
 
-import           Stack2nix.External.Util (failHard, runCmd, runCmdFrom)
+import           Stack2nix.External.Util (failHardWith, runCmd, runCmdFrom)
 import           System.Exit             (ExitCode (..))
 
 data Command = OutsideRepo ExternalCmd
@@ -23,8 +23,8 @@ git (InsideRepo dir cmd) = runInternal dir cmd
 
 runExternal :: ExternalCmd -> IO (ExitCode, String, String)
 runExternal (Clone uri dir) =
-  runCmd exe ["clone", uri, dir] >>= failHard
+  runCmd exe ["clone", uri, dir] >>= failHardWith ("git: expected " ++ uri ++ " to be a repository, but it can't be cloned")
 
 runInternal :: FilePath -> InternalCmd -> IO (ExitCode, String, String)
 runInternal repoDir (Checkout ref) =
-  runCmdFrom repoDir exe ["checkout", ref] >>= failHard
+  runCmdFrom repoDir exe ["checkout", ref] >>= failHardWith ("git: failed to checkout revision " ++ ref)

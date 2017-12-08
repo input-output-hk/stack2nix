@@ -18,9 +18,13 @@ runCmdFrom dir prog args = do
 runCmd :: String -> [String] -> IO (ExitCode, String, String)
 runCmd prog args = getCurrentDirectory >>= (\d -> runCmdFrom d prog args)
 
-failHard :: (ExitCode, String, String) -> IO (ExitCode, String, String)
-failHard r@(ExitSuccess, _, _)         = pure r
-failHard (ExitFailure code, _, stderr) =
+failHardWith :: String -> (ExitCode, String, String) -> IO (ExitCode, String, String)
+failHardWith _msg r@(ExitSuccess, _, _)        = pure r
+failHardWith msg (ExitFailure code, _, stderr) =
   error $ unlines [ "Failed with exit code " <> show code <> "..."
-                  , show stderr
+                  , stderr
+                  , msg
                   ]
+
+failHard :: (ExitCode, String, String) -> IO (ExitCode, String, String)
+failHard = failHardWith ""
