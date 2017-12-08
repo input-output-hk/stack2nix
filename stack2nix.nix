@@ -662,11 +662,15 @@ self: {
           description = "A Setup.hs helper for doctests running";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      cabal2nix = callPackage ({ Cabal, aeson, ansi-wl-pprint, base, bytestring, cabal-doctest, containers, deepseq, directory, distribution-nixpkgs, filepath, hackage-db, hopenssl, hpack, language-nix, lens, mkDerivation, monad-par, monad-par-extras, mtl, optparse-applicative, pretty, process, split, stdenv, text, time, transformers, utf8-string, yaml }:
+      cabal2nix = callPackage ({ Cabal, aeson, ansi-wl-pprint, base, bytestring, cabal-doctest, containers, deepseq, directory, distribution-nixpkgs, fetchgit, filepath, hackage-db, hopenssl, hpack, language-nix, lens, mkDerivation, monad-par, monad-par-extras, mtl, optparse-applicative, pretty, process, split, stdenv, text, time, transformers, utf8-string, yaml }:
       mkDerivation {
           pname = "cabal2nix";
           version = "2.7";
-          sha256 = "6d59b36e59d01134fbbc0e949fc2adc4f6aedd2d757fbed2b6a4621777a3fffa";
+          src = fetchgit {
+            url = "https://github.com/NixOS/cabal2nix.git";
+            sha256 = "0h7395vmh0fpypjbqn6yqn2ms71g13w1wlwhnhz85ljdlfdhjq85";
+            rev = "cba06639637a6764d78ab11bc0961a6815f699fd";
+          };
           isLibrary = true;
           isExecutable = true;
           setupHaskellDepends = [
@@ -1751,8 +1755,8 @@ self: {
       hscolour = callPackage ({ base, containers, mkDerivation, stdenv }:
       mkDerivation {
           pname = "hscolour";
-          version = "1.24.2";
-          sha256 = "55fb86bafdcad9613c25910b1cbca4b071c1ddc6365538c3b3d4e350cb30cf22";
+          version = "1.24.4";
+          sha256 = "243332b082294117f37b2c2c68079fa61af68b36223b3fc07594f245e0e5321d";
           isLibrary = true;
           isExecutable = true;
           enableSeparateDataOutput = true;
@@ -3184,8 +3188,8 @@ self: {
           pname = "scientific";
           version = "0.3.5.2";
           sha256 = "5ce479ff95482fb907267516bd0f8fff450bdeea546bbd1267fe035acf975657";
-          revision = "1";
-          editedCabalFile = "1gnz52yrd9bnq4qvd4v9kd00clx0sfbh64phafdq5g2hbk9yrg0v";
+          revision = "2";
+          editedCabalFile = "0wsrd213480p3pqrd6i650fr092yv7dhla7a85p8154pn5gvbr0a";
           libraryHaskellDepends = [
             base
             binary
@@ -3209,8 +3213,8 @@ self: {
           pname = "semigroupoids";
           version = "5.2.1";
           sha256 = "79e41eb7cbcb4f152343b91243feac0a120375284c1207edaa73b23d8df6d200";
-          revision = "2";
-          editedCabalFile = "049j2jl6f5mxqnavi1aadx37j4bk5xksvkxsl43hp4rg7n53p11z";
+          revision = "3";
+          editedCabalFile = "0wzcnpz8pyjk823vqnq5s8krsb8i6cw573hcschpd9x5ynq4li70";
           setupHaskellDepends = [
             base
             Cabal
