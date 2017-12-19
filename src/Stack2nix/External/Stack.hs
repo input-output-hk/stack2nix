@@ -7,12 +7,15 @@ module Stack2nix.External.Stack
 
 import           Control.Applicative           ((<|>))
 import           Control.Monad                 (unless)
+import           Control.Monad.Reader          (local)
 import           Data.List                     (isInfixOf, nubBy, sortBy)
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
 import qualified Data.Set                      as S
 import           Data.Text                     (pack, unpack)
 import           Data.Time                     (UTCTime)
+import           Distribution.System           (OS(..), Arch(..), Platform(..))
+import           Lens.Micro                    (set)
 import           Options.Applicative
 import           Stack.Build                   (mkBaseConfigOpts,
                                                 withLoadPackage)
@@ -126,32 +129,33 @@ planAndGenerate :: HasEnvConfig env
                 -> IO ()
                 -> RIO env ()
 planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev hSnapshot threads doAfter = do
-  bopts <- view buildOptsL
-  let profiling = boptsLibProfile bopts || boptsExeProfile bopts
-  let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
-  menv <- getMinimalEnvOverride
+  local (set platformL (Platform X86_64 OSX)) $ do
+    bopts <- view buildOptsL
+    let profiling = boptsLibProfile bopts || boptsExeProfile bopts
+    let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
+    menv <- getMinimalEnvOverride
 
-  (_targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
-  _stackYaml <- view stackYamlL
+    (_targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    _stackYaml <- view stackYamlL
 
-  (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, localDumpPkgs) <-
-    getInstalled menv
-                 GetInstalledOpts
-                   { getInstalledProfiling = profiling
-                   , getInstalledHaddock   = shouldHaddockDeps bopts
-                   , getInstalledSymbols   = symbols }
-                 sourceMap
+    (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, localDumpPkgs) <-
+      getInstalled menv
+                   GetInstalledOpts
+                     { getInstalledProfiling = profiling
+                     , getInstalledHaddock   = shouldHaddockDeps bopts
+                     , getInstalledSymbols   = symbols }
+                   sourceMap
 
-  baseConfigOpts <- mkBaseConfigOpts boptsCli
-  plan <- withLoadPackage $ \loadPackage ->
-    constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
-  let pkgs = prioritize $ planToPackages plan ++ revPkgs
-  liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
+    baseConfigOpts <- mkBaseConfigOpts boptsCli
+    plan <- withLoadPackage $ \loadPackage ->
+      constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    let pkgs = prioritize $ planToPackages plan ++ revPkgs
+    liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
-  hackageDB <- liftIO $ loadHackageDB Nothing hSnapshot
-  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hackageDB) $ words "hscolour stringbuilder"
-  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
-  liftIO doAfter
+    hackageDB <- liftIO $ loadHackageDB Nothing hSnapshot
+    void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hackageDB) $ words "hscolour stringbuilder"
+    void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
+    liftIO doAfter
 
 runPlan :: FilePath
         -> FilePath
