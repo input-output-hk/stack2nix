@@ -17,6 +17,7 @@ args = Args
        <*> switch (long "haddock" <> help "enable documentation generation")
        <*> optional (option utcTimeReader (long "hackage-snapshot" <> help "hackage snapshot time, ISO format"))
        <*> strArgument (metavar "URI")
+       <*> switch (long "verbose" <> help "verbose output")
   where
     -- | A parser for the date. Hackage updates happen maybe once or twice a month.
     -- Example: parseTime defaultTimeLocale "%FT%T%QZ" "2017-11-20T12:18:35Z" :: Maybe UTCTime

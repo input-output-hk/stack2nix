@@ -2,6 +2,7 @@ module Stack2nix.Util
   ( assertMinVer
   , extractVersion
   , mapPool
+  , logDebug
   ) where
 
 import           Control.Concurrent.Async
@@ -14,6 +15,7 @@ import           Data.Version                 (Version (..), parseVersion,
                                                showVersion)
 import           GHC.Exts                     (sortWith)
 import           Stack2nix.External.Util      (runCmd)
+import           Stack2nix.Types              (Args, argVerbose)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hPutStrLn, stderr)
 import           Text.ParserCombinators.ReadP (readP_to_S)
@@ -44,3 +46,8 @@ assertMinVer prog minVer = do
       let ver = extractVersion out in
         unless (ver >= extractVersion minVer) $ error $ unwords ["ERROR:", prog, "version must be", minVer, "or higher. Current version:", maybe "[parse failure]" showVersion ver]
     (ExitFailure _, _, err)  -> error err
+
+logDebug :: Args -> String -> IO ()
+logDebug args msg
+  | argVerbose args = hPutStrLn stderr msg
+  | otherwise = return ()

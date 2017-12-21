@@ -39,7 +39,7 @@ import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
 import           Stack2nix.Types            (Args (..))
 import           Stack2nix.Util
 import           System.Directory           (canonicalizePath, doesFileExist,
-                                             withCurrentDirectory)
+                                             getCurrentDirectory, withCurrentDirectory)
 import           System.Environment         (getEnv)
 import           System.FilePath            (dropExtension, isAbsolute,
                                              normalise, takeDirectory,
@@ -55,9 +55,9 @@ stack2nix args@Args{..} = do
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
   let projRoot = argUri
   isLocalRepo <- doesFileExist $ projRoot </> "stack.yaml"
-  --  hPutStrLn stderr $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
-  --  hPutStrLn stderr $ "stack2nix (projRoot): " ++ show projRoot
-  --  hPutStrLn stderr $ "stack2nix (argUri): " ++ show argUri
+  logDebug args $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
+  logDebug args $ "stack2nix (projRoot): " ++ show projRoot
+  logDebug args $ "stack2nix (argUri): " ++ show argUri
   if isLocalRepo
   then handleStackConfig Nothing projRoot
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
@@ -81,14 +81,14 @@ stack2nix args@Args{..} = do
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
     handleStackConfig remoteUri localDir = do
-      -- cwd <- getCurrentDirectory
-      -- hPutStrLn stderr $ "handleStackConfig (cwd): " ++ cwd
-      -- hPutStrLn stderr $ "handleStackConfig (localDir): " ++ localDir
-      -- hPutStrLn stderr $ "handleStackConfig (remoteUri): " ++ show remoteUri
+      cwd <- getCurrentDirectory
+      logDebug args $ "handleStackConfig (cwd): " ++ cwd
+      logDebug args $ "handleStackConfig (localDir): " ++ localDir
+      logDebug args $ "handleStackConfig (remoteUri): " ++ show remoteUri
       let stackFile = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
-      -- hPutStrLn stderr $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
+      logDebug args $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
       cp <- canonicalizePath stackFile
       fp <- parseAbsFile cp
       lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->

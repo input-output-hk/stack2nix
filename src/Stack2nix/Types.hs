@@ -10,5 +10,6 @@ data Args = Args
   , argHaddock         :: Bool
   , argHackageSnapshot :: Maybe UTCTime
   , argUri             :: String
+  , argVerbose         :: Bool
   }
   deriving (Show)
