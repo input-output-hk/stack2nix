@@ -12,6 +12,7 @@ import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
 import qualified Data.Set                      as S
 import           Data.Text                     (pack, unpack)
+import           Data.Time                     (UTCTime)
 import           Options.Applicative
 import           Stack.Build                   (mkBaseConfigOpts,
                                                 withLoadPackage)
@@ -45,14 +46,16 @@ import           System.Directory              (canonicalizePath,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               (makeRelative, (</>))
 import           System.IO                     (hPutStrLn, stderr)
+import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
+import Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
 
 data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | CabalPackage PackageIdentifier
                 | RepoPackage (Repo Subdirs)
                 deriving (Eq, Show)
 
-genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> PackageRef -> IO ()
-genNixFile baseDir outDir uri argRev pkgRef = do
+genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO ()
+genNixFile baseDir outDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   -- hPutStrLn stderr $ "\nGenerating nix expression for " ++ show pkgRef
   -- hPutStrLn stderr $ "genNixFile (cwd): " ++ cwd
@@ -69,15 +72,15 @@ genNixFile baseDir outDir uri argRev pkgRef = do
       let defDir = baseDir </> makeRelative projRoot path
       -- hPutStrLn stderr $ "genNixFile (LocalPackage: defDir): " ++ defDir
       unless (".s2n" `isInfixOf` path) $
-        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir)
+        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir) hackageDB
     CabalPackage pkg ->
-      void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir)
+      void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir) hackageDB
     RepoPackage repo ->
       case repoSubdirs repo of
         ExplicitSubdirs sds ->
-          mapM_ (\sd -> cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir)) sds
+          mapM_ (\sd -> cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir) hackageDB) sds
         DefaultSubdirs ->
-          void $ cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir)
+          void $ cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir) hackageDB
 
 planToPackages :: Plan -> [PackageRef]
 planToPackages plan = concatMap taskToPackages $ M.elems $ planTasks plan
@@ -118,10 +121,11 @@ planAndGenerate :: HasEnvConfig env
                 -> Maybe String
                 -> [PackageRef]
                 -> Maybe String
+                -> Maybe UTCTime
                 -> Int
                 -> IO ()
                 -> RIO env ()
-planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter = do
+planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev hSnapshot threads doAfter = do
   bopts <- view buildOptsL
   let profiling = boptsLibProfile bopts || boptsExeProfile bopts
   let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
@@ -142,10 +146,11 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev threads doAfter
   plan <- withLoadPackage $ \loadPackage ->
     constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
   let pkgs = prioritize $ planToPackages plan ++ revPkgs
-  -- liftIO $ hPutStrLn stderr $ "plan:\n" ++ ppShow pkgs
+  liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
-  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir)) $ words "hscolour stringbuilder"
-  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev) pkgs
+  hackageDB <- liftIO $ loadHackageDB Nothing hSnapshot
+  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hackageDB) $ words "hscolour stringbuilder"
+  void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
   liftIO doAfter
 
 runPlan :: FilePath
@@ -166,7 +171,7 @@ runPlan baseDir outDir remoteUri revPkgs lc args@Args{..} doAfter = do
              pure $ globalOpts baseDir stackRoot includes libs args
   -- hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
   -- hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev argThreads doAfter
+  withBuildConfig globals $ planAndGenerate buildOpts baseDir outDir remoteUri revPkgs argRev argHackageSnapshot argThreads doAfter
 
 {-
   TODO:
@@ -198,6 +203,7 @@ globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
          { configMonoidExtraIncludeDirs = extraIncludes
          , configMonoidExtraLibDirs = extraLibs
          }
+     , globalLogLevel = if argVerbose then LevelDebug else LevelInfo
      }
   where
     pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc

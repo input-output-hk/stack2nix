@@ -2,36 +2,36 @@ module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
 
-import           Data.List               (stripPrefix, takeWhile)
-import           Data.Maybe              (fromMaybe)
-import           Data.Monoid             ((<>))
-import           Data.Text               (Text, unpack)
-import           Stack2nix.External.Util (runCmd)
-import           System.Exit             (ExitCode (..))
-import           System.FilePath         ((</>))
-import           System.IO               (hPutStrLn, stderr)
+import           Cabal2nix                   (cabal2nixWithDB)
+import           Data.List                   (stripPrefix, takeWhile)
+import           Data.Maybe                  (fromMaybe)
+import           Data.Monoid                 ((<>))
+import           Data.Text                   (Text, unpack)
+import           Language.Nix.PrettyPrinting (pPrint)
+import           System.FilePath             ((</>))
+import           System.IO                   (hPutStrLn, stderr)
+import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 
--- Requires cabal2nix >= 2.2 in PATH
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> IO (ExitCode, String, String)
-cabal2nix uri commit subpath outDir = do
-  result <- runCmd exe (args $ fromMaybe "." subpath)
+cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> DB.HackageDB -> IO ()
+cabal2nix uri commit subpath outDir hackageDB = do
+  let runCmdArgs = args $ fromMaybe "." subpath
+  hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
+  result <- cabal2nixWithDB hackageDB runCmdArgs
   case result of
-    (ExitSuccess, stdout, _) ->
-      let basename = pname stdout <> ".nix"
+    Right deriv ->
+      let out = show $ pPrint deriv
+          basename = pname out <> ".nix"
           fname = maybe basename (</> basename) outDir
       in
-      writeFile fname stdout >> return result
-    (_, _, err) -> do
+      writeFile fname out
+    Left err ->
       hPutStrLn stderr $ unwords [ "ERROR: cabal2nix failed on"
                                  , uri
                                  , "(rev: " ++ show commit ++ ";"
                                  , "subpath: " ++ show subpath ++ "):"
-                                 , "\n" ++ err
+                                 , "\n" ++ show err
                                  ]
-      return result
   where
-    exe = "cabal2nix"
-
     args :: FilePath -> [String]
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
