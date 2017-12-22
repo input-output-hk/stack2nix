@@ -203,6 +203,7 @@ globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
          { configMonoidExtraIncludeDirs = extraIncludes
          , configMonoidExtraLibDirs = extraLibs
          }
+     , globalLogLevel = if argVerbose then LevelDebug else LevelInfo
      }
   where
     pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
