@@ -147,18 +147,14 @@ patchAndMerge Args{..} baseDir BuildConfig{..} outDir = do
     patchNixFile fname = do
       contents <- readFile fname
       case parseNixString contents of
-        Success expr ->
-          case takeFileName fname of
-            "hspec.nix" ->
-              writeFile fname $ show $ prettyNix $ (addParam "stringbuilder" . stripNonEssentialDeps False) expr
-            _ -> do
-              pkgs <- localPackages
-              let
-                shouldPatch = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
-                shouldTest = argTest && shouldPatch
-                expr' = stripNonEssentialDeps shouldTest (if shouldTest then enableAttr "doCheck" expr else expr)
-                expr'' = if argHaddock && shouldPatch then enableAttr "doHaddock" expr' else expr'
-              writeFile fname $ show $ prettyNix expr''
+        Success expr -> do
+          pkgs <- localPackages
+          let
+            shouldPatch = any (\p -> (p <.> "nix") `isSuffixOf` fname) pkgs
+            shouldTest = argTest && shouldPatch
+            expr' = stripNonEssentialDeps shouldTest (if shouldTest then enableAttr "doCheck" expr else expr)
+            expr'' = if argHaddock && shouldPatch then enableAttr "doHaddock" expr' else expr'
+          writeFile fname $ show $ prettyNix expr''
         _ -> error "failed to parse intermediary nix package file"
 
     enableAttr :: Text -> NExpr -> NExpr
@@ -177,17 +173,6 @@ patchAndMerge Args{..} baseDir BuildConfig{..} outDir = do
                              then NamedVar [StaticKey k] (Fix (NConstant (NBool True)))
                              else attr
                            x -> x
-
-    addParam :: String -> NExpr -> NExpr
-    addParam param expr =
-      let contents = show $ prettyNix expr
-          (l:ls) = lines contents
-          (openBrace, params) = splitAt 1 (words l)
-          l' = unwords $ openBrace ++ [param ++ ", "] ++ params
-      in
-      case parseNixString $ unlines (l':ls) of
-        Success expr' -> expr'
-        _             -> expr
 
     stripNonEssentialDeps :: Bool -> NExpr -> NExpr
     stripNonEssentialDeps keepTests expr =

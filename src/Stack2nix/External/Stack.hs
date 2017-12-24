@@ -35,7 +35,8 @@ import           Stack.Types.Config
 import           Stack.Types.Config.Build      (BuildCommand (..))
 import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
-                                                packageIdentifierString)
+                                                packageIdentifierString,
+                                                parsePackageIdentifier)
 import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Types               (Args (..))
@@ -145,11 +146,12 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs argRev hSnapshot threa
   baseConfigOpts <- mkBaseConfigOpts boptsCli
   plan <- withLoadPackage $ \loadPackage ->
     constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
-  let pkgs = prioritize $ planToPackages plan ++ revPkgs
+  -- hscolour is needed until https://github.com/NixOS/nixpkgs/issues/32609 is addressed
+  hscolour <-parsePackageIdentifier "hscolour-1.24.4"
+  let pkgs = prioritize $ planToPackages plan ++ revPkgs ++ [CabalPackage hscolour]
   liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
   hackageDB <- liftIO $ loadHackageDB Nothing hSnapshot
-  void $ liftIO $ mapM_ (\pkg -> cabal2nix ("cabal://" ++ pkg) Nothing Nothing (Just outDir) hackageDB) $ words "hscolour stringbuilder"
   void $ liftIO $ mapPool threads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
   liftIO doAfter
 

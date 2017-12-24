@@ -1774,7 +1774,7 @@ self: {
           description = "Colourise Haskell code";
           license = "LGPL";
         }) {};
-      hspec = callPackage ({ HUnit, QuickCheck, base, call-stack, hspec-core, hspec-discover, hspec-expectations, mkDerivation, stdenv, stringbuilder, transformers }:
+      hspec = callPackage ({ HUnit, QuickCheck, base, call-stack, hspec-core, hspec-discover, hspec-expectations, mkDerivation, stdenv, transformers }:
       mkDerivation {
           pname = "hspec";
           version = "2.4.4";
@@ -3644,19 +3644,6 @@ self: {
           description = "Common lower-level functions needed by various streaming data libraries";
           license = stdenv.lib.licenses.mit;
         }) {};
-      stringbuilder = callPackage ({ base, mkDerivation, stdenv }:
-      mkDerivation {
-          pname = "stringbuilder";
-          version = "0.5.0";
-          sha256 = "8966882622fc06fd4e588da626a558b54daa313f2328c188d9305b0c6f2fe9aa";
-          libraryHaskellDepends = [
-            base
-          ];
-          doHaddock = false;
-          doCheck = false;
-          description = "A writer monad for multi-line string literals";
-          license = stdenv.lib.licenses.mit;
-        }) {};
       syb = callPackage ({ base, mkDerivation, stdenv }:
       mkDerivation {
           pname = "syb";
@@ -4160,8 +4147,8 @@ self: {
           pname = "utf8-string";
           version = "1.0.1.1";
           sha256 = "fb0b9e3acbe0605bcd1c63e51f290a7bbbe6628dfa3294ff453e4235fbaef140";
-          revision = "2";
-          editedCabalFile = "1b97s9picjl689hcz8scinv7c8k5iaal1livqr0l1l8yc4h0imhr";
+          revision = "3";
+          editedCabalFile = "02vhj5gykkqa2dyn7s6gn8is1b5fdn9xcqqvlls268g7cpv6rk38";
           libraryHaskellDepends = [
             base
             bytestring
