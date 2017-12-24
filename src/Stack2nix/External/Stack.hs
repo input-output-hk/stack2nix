@@ -56,8 +56,8 @@ data PackageRef = LocalPackage PackageIdentifier FilePath (Maybe Text)
                 | RepoPackage (Repo Subdirs)
                 deriving (Eq, Show)
 
-genNixFile :: FilePath -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO ()
-genNixFile baseDir outDir uri argRev hackageDB pkgRef = do
+genNixFile :: Args -> FilePath -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO ()
+genNixFile args baseDir outDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   -- hPutStrLn stderr $ "\nGenerating nix expression for " ++ show pkgRef
   -- hPutStrLn stderr $ "genNixFile (cwd): " ++ cwd
@@ -74,15 +74,15 @@ genNixFile baseDir outDir uri argRev hackageDB pkgRef = do
       let defDir = baseDir </> makeRelative projRoot path
       -- hPutStrLn stderr $ "genNixFile (LocalPackage: defDir): " ++ defDir
       unless (".s2n" `isInfixOf` path) $
-        void $ cabal2nix (fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir) hackageDB
+        void $ cabal2nix args(fromMaybe defDir uri) (mrev <|> (pack <$> argRev)) (const relPath <$> uri) (Just outDir) hackageDB
     CabalPackage pkg ->
-      void $ cabal2nix ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir) hackageDB
+      void $ cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing (Just outDir) hackageDB
     RepoPackage repo ->
       case repoSubdirs repo of
         ExplicitSubdirs sds ->
-          mapM_ (\sd -> cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir) hackageDB) sds
+          mapM_ (\sd -> cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just sd) (Just outDir) hackageDB) sds
         DefaultSubdirs ->
-          void $ cabal2nix (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir) hackageDB
+          void $ cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) Nothing (Just outDir) hackageDB
 
 planToPackages :: Plan -> [PackageRef]
 planToPackages plan = concatMap taskToPackages $ M.elems $ planTasks plan
@@ -125,7 +125,7 @@ planAndGenerate :: HasEnvConfig env
                 -> Args
                 -> IO ()
                 -> RIO env ()
-planAndGenerate boptsCli baseDir outDir remoteUri revPkgs Args{..} doAfter = do
+planAndGenerate boptsCli baseDir outDir remoteUri revPkgs args@Args{..} doAfter = do
   local (set platformL argPlatform) $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
@@ -152,7 +152,7 @@ planAndGenerate boptsCli baseDir outDir remoteUri revPkgs Args{..} doAfter = do
     liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
 
     hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
-    void $ liftIO $ mapPool argThreads (genNixFile baseDir outDir remoteUri argRev hackageDB) pkgs
+    void $ liftIO $ mapPool argThreads (genNixFile args baseDir outDir remoteUri argRev hackageDB) pkgs
     liftIO doAfter
 
 runPlan :: FilePath
