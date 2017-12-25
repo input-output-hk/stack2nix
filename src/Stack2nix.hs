@@ -87,7 +87,7 @@ stack2nix args@Args{..} = do
       logDebug args $ "handleStackConfig (remoteUri): " ++ show remoteUri
       let stackFile = localDir </> "stack.yaml"
       alreadyExists <- doesFileExist stackFile
-      unless alreadyExists $ void $ runCmdFrom localDir "stack" ["init", "--system-ghc"]
+      unless alreadyExists $ error $ stackFile <> " does not exist. Use 'stack init' to create it."
       logDebug args $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
       cp <- canonicalizePath stackFile
       fp <- parseAbsFile cp
