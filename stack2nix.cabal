@@ -28,6 +28,8 @@ library
                      , filepath >= 1.4.1.1 && < 1.5
                      , Glob >= 0.7.14 && < 0.9
                      , hnix >= 0.3.4 && < 0.4
+                     , mtl
+                     , microlens
                      , optparse-applicative >= 0.13.2 && < 0.14
                      , path
                      , process >= 1.4.3 && < 1.5

@@ -3470,7 +3470,7 @@ self: {
           description = "The Haskell Tool Stack";
           license = stdenv.lib.licenses.bsd3;
         }) {};
-      stack2nix = callPackage ({ Cabal, Glob, SafeSemaphore, async, base, cabal2nix, containers, data-fix, directory, distribution-nixpkgs, filepath, hnix, mkDerivation, optparse-applicative, path, process, regex-pcre, stack, stdenv, temporary, text, time }:
+      stack2nix = callPackage ({ Cabal, Glob, SafeSemaphore, async, base, cabal2nix, containers, data-fix, directory, distribution-nixpkgs, filepath, hnix, microlens, mkDerivation, mtl, optparse-applicative, path, process, regex-pcre, stack, stdenv, temporary, text, time }:
       mkDerivation {
           pname = "stack2nix";
           version = "0.1.3.1";
@@ -3489,6 +3489,8 @@ self: {
             filepath
             Glob
             hnix
+            microlens
+            mtl
             optparse-applicative
             path
             process

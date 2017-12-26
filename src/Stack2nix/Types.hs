@@ -1,6 +1,7 @@
 module Stack2nix.Types where
 
 import Data.Time (UTCTime)
+import Distribution.System (Platform)
 
 data Args = Args
   { argRev             :: Maybe String
@@ -9,6 +10,7 @@ data Args = Args
   , argTest            :: Bool
   , argHaddock         :: Bool
   , argHackageSnapshot :: Maybe UTCTime
+  , argPlatform        :: Platform
   , argUri             :: String
   , argVerbose         :: Bool
   }

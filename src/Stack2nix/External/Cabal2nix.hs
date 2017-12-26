@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards   #-}
+
 module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
@@ -7,13 +9,15 @@ import           Data.List                   (stripPrefix, takeWhile)
 import           Data.Maybe                  (fromMaybe)
 import           Data.Monoid                 ((<>))
 import           Data.Text                   (Text, unpack)
+import           Distribution.System         (Platform(..), Arch(..), OS(..))
 import           Language.Nix.PrettyPrinting (pPrint)
 import           System.FilePath             ((</>))
 import           System.IO                   (hPutStrLn, stderr)
+import           Stack2nix.Types             (Args (..))
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 
-cabal2nix :: FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> DB.HackageDB -> IO ()
-cabal2nix uri commit subpath outDir hackageDB = do
+cabal2nix :: Args -> FilePath -> Maybe Text -> Maybe FilePath -> Maybe FilePath -> DB.HackageDB -> IO ()
+cabal2nix Args{..} uri commit subpath outDir hackageDB = do
   let runCmdArgs = args $ fromMaybe "." subpath
   hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
   result <- cabal2nixWithDB hackageDB runCmdArgs
@@ -36,7 +40,7 @@ cabal2nix uri commit subpath outDir hackageDB = do
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , ["--subpath", dir]
-      , ["--system", "x86_64-linux"]
+      , ["--system", fromCabalPlatform argPlatform]
       , ["--no-check", "--no-haddock"]
       , [uri]
       ]
@@ -50,3 +54,10 @@ cabal2nix uri commit subpath outDir hackageDB = do
       case stripPrefix "  pname = \"" x of
         Just x' -> takeWhile (/= '"') x'
         Nothing -> pname' xs
+
+-- | Copied (and modified) from src/Distribution/Nixpkgs/Meta.hs
+fromCabalPlatform :: Platform -> String
+fromCabalPlatform (Platform I386 Linux)   = "i686-linux"
+fromCabalPlatform (Platform X86_64 Linux) = "x86_64-linux"
+fromCabalPlatform (Platform X86_64 OSX)   = "x86_64-darwin"
+fromCabalPlatform p                       = error ("fromCabalPlatform: invalid Nix platform" ++ show p)
