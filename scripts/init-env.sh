@@ -12,4 +12,4 @@ STACK=$(nix-build -A stack $NIXPKGS)/bin
 NIX_PREFETCH=$(nix-build -A nix-prefetch-git $NIXPKGS)/bin
 GIT=$(nix-build -A git $NIXPKGS)/bin
 CABAL_INSTALL=$(nix-build -A cabal-install $NIXPKGS)/bin
-export PATH="$HOME/.local/bin:$STACK:$NIX_PREFETCH:$GIT:$CABAL_INSTALL:$PATH"
+export PATH="$STACK:$NIX_PREFETCH:$GIT:$CABAL_INSTALL:$HOME/.local/bin:$PATH"
