@@ -12,7 +12,7 @@ source $scriptDir/init-env.sh
 
 # basic remote
 \time stack2nix --verbose -o /tmp/haskell-dummy-project1.nix \
-	  --revision 7e7d91d86ba0f86633ab37279c013879ade09e32 \
+	  --revision 31aac4dcc7b87d5cb62dafe9b9402346fdf449a6 \
 	  https://github.com/jmitchell/haskell-dummy-project1.git
 \time nix-build -A haskell-dummy-package1 /tmp/haskell-dummy-project1.nix
 
