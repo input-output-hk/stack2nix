@@ -1,23 +1,26 @@
-resolver: lts-9.14
+resolver: lts-9.20
 
 packages:
 - '.'
 - location:
-   git: https://github.com/commercialhaskell/stack.git
-   commit: 7bddfaf7f9f8cd9ec1c710fa83e77262e494eee4
-  extra-dep: true
-- location:
    git: https://github.com/NixOS/cabal2nix.git
-   commit: cba06639637a6764d78ab11bc0961a6815f699fd
+   commit: e72fbdfe57941627633006fa1fb4003e26619424
   extra-dep: true
 
 extra-deps:
+- stack-1.6.3
+- Cabal-2.0.1.1
 - hnix-0.3.4
 - bindings-uname-0.1
-- Cabal-2.0.0.2
 - hackage-db-2.0
 - path-0.6.1
 - path-io-1.3.3
+- ansi-terminal-0.7.1.1
+- ansi-wl-pprint-0.6.8.1
+- extra-1.6.2
+- hpack-0.21.2
+- unliftio-0.2.1.0
+- trifecta-1.7.1.1
 
 flags: {}
 
