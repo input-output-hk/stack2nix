@@ -51,21 +51,20 @@ data PackageRef
   | NonHackagePackage PackageIdentifier (PackageLocation FilePath)
   deriving (Eq, Show)
 
-genNixFile :: Args -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO [Either Doc Derivation]
+genNixFile :: Args -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
 genNixFile args baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
     NonHackagePackage _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage (PackageIdentifierRevision pkg revision) -> -- FIXME use cabal revision
-      fmap (:[]) $ cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
+    HackagePackage (PackageIdentifierRevision pkg rev) -> do
+      cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
     NonHackagePackage _ident (PLRepo repo) ->
-     fmap (:[]) $ cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
+      cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
     NonHackagePackage _ident (PLFilePath path) -> do
       relPath <- makeRelativeToCurrentDirectory path
       projRoot <- canonicalizePath $ cwd </> baseDir
       let defDir = baseDir </> makeRelative projRoot path
-      fmap (:[]) $ cabal2nix args (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
-
+      cabal2nix args (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
 
 -- TODO: remove once we use flags, options
 sourceMapToPackages :: Map PackageName PackageSource -> [PackageRef]
@@ -93,7 +92,7 @@ planAndGenerate boptsCli baseDir remoteUri args@Args{..} = do
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
   drvs <- liftIO $ mapPool argThreads (genNixFile args baseDir remoteUri argRev hackageDB) pkgs
   let locals = map (\l -> show (packageName (lpPackage l))) _locals
-  liftIO $ render (concat drvs) args locals
+  liftIO $ render drvs args locals
 
 runPlan :: FilePath
         -> Maybe String

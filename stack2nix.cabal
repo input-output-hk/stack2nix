@@ -31,7 +31,6 @@ library
                      , path
                      , pretty
                      , language-nix
-                     , lens
                      , process >= 1.4.3 && < 1.5
                      , regex-pcre >= 0.94.4 && < 0.95
                      , SafeSemaphore >= 0.10.1 && < 0.11
