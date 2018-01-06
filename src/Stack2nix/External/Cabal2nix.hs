@@ -26,7 +26,6 @@ cabal2nix Args{..} uri commit subpath hackageDB = do
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
-      , ["--no-check", "--no-haddock"]
       , [uri]
       ]
 

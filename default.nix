@@ -4,11 +4,8 @@ with pkgs.haskell.lib;
 
 ((import ./stack2nix.nix { inherit pkgs; }).override {
   overrides = self: super: {
+    # TODO: separate out output
     stack2nix = justStaticExecutables super.stack2nix;
-
-    # https://github.com/input-output-hk/stack2nix/issues/51
-    Cabal = pkgs.haskell.packages.ghc802.Cabal_2_0_0_2;
-    Cabal_2_0_0_2 = pkgs.haskell.packages.ghc802.Cabal_2_0_0_2;
 
     # https://github.com/NixOS/cabal2nix/issues/146
     hinotify = if pkgs.stdenv.isDarwin then self.hfsevents else super.hinotify;
