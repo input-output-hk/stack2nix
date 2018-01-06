@@ -96,19 +96,12 @@ planAndGenerate boptsCli baseDir remoteUri args@Args{..} = do
 
 runPlan :: FilePath
         -> Maybe String
-        -> LoadConfig
         -> Args
         -> IO ()
-runPlan baseDir remoteUri lc args@Args{..} = do
-  let pkgsInConfig = nixPackages (configNix $ lcConfig lc)
-  let pkgs = map unpack pkgsInConfig ++ ["ghc", "git"]
+runPlan baseDir remoteUri args@Args{..} = do
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
-  globals <- queryNixPkgsPaths Include pkgs >>= \includes ->
-             queryNixPkgsPaths Lib pkgs >>= \libs ->
-             pure $ globalOpts baseDir stackRoot includes libs args
-  -- hPutStrLn stderr $ "stack global opts:\n" ++ ppShow globals
-  -- hPutStrLn stderr $ "stack build opts:\n" ++ ppShow buildOpts
+  let globals = globalOpts baseDir stackRoot args
   withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args
 
 {-
@@ -118,29 +111,12 @@ runPlan baseDir remoteUri lc args@Args{..} = do
   - remove baseDir arguments; due to withCurrentDirectory it should always be PWD.
 -}
 
-data NixPkgPath = Lib
-                | Include
-
-queryNixPkgsPaths :: NixPkgPath -> [String] -> IO (Set FilePath)
-queryNixPkgsPaths kind pkgs = do
-  (_, out, _) <- runCmd "nix-instantiate" [ "--eval"
-                                          , "-E"
-                                          , "with import <nixpkgs>{}; lib.concatMapStringsSep \" \" (pkg: ''" ++ query kind ++ "'') [" ++ unwords pkgs ++ "]"
-                                          ]
-                 >>= failHard
-  pure . S.fromList . words . filter (/= '"') $ out
-    where
-      query Lib     = "${lib.getLib pkg}/lib"
-      query Include = "${lib.getDev pkg}/include"
-
-globalOpts :: FilePath -> FilePath -> Set FilePath -> Set FilePath -> Args -> GlobalOpts
-globalOpts currentDir stackRoot extraIncludes extraLibs Args{..} =
+globalOpts :: FilePath -> FilePath -> Args -> GlobalOpts
+globalOpts currentDir stackRoot Args{..} =
   go { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
      , globalConfigMonoid =
          (globalConfigMonoid go)
-         { configMonoidExtraIncludeDirs = extraIncludes
-         , configMonoidExtraLibDirs = extraLibs
-         , configMonoidNixOpts = mempty
+         { configMonoidNixOpts = mempty
            { nixMonoidEnable = First (Just True)
            }
          }

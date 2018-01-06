@@ -9,31 +9,19 @@ module Stack2nix
   ) where
 
 import           Control.Monad              (unless, void)
-import           Data.List                  (foldl', isInfixOf, isSuffixOf,
-                                             sort, union, (\\))
-import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (isJust)
 import           Data.Monoid                ((<>))
-import           Data.Text                  (Text, unpack)
-import           Path                       (parseAbsFile)
 import           Paths_stack2nix            (version)
-import           Stack.Config
-import           Stack.Prelude              (LogLevel (..), runRIO)
-import           Stack.Types.BuildPlan
-import           Stack.Types.Config
-import           Stack.Types.Runner
 import           Stack2nix.External.Stack
 import           Stack2nix.External.Util    (runCmdFrom)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           Stack2nix.Types            (Args (..))
 import           Stack2nix.Util
-import           System.Directory           (canonicalizePath, doesFileExist,
+import           System.Directory           (doesFileExist,
                                              getCurrentDirectory, withCurrentDirectory)
 import           System.Environment         (getEnv)
-import           System.FilePath            (dropExtension, isAbsolute,
-                                             normalise, takeDirectory,
-                                             takeFileName, (<.>), (</>))
+import           System.FilePath            ((</>))
 import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
@@ -78,12 +66,7 @@ stack2nix args@Args{..} = do
       alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ error $ stackFile <> " does not exist. Use 'stack init' to create it."
       logDebug args $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
-      cp <- canonicalizePath stackFile
-      fp <- parseAbsFile cp
-      lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->
-        -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
-        runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
       let go = if isJust remoteUri
                then withCurrentDirectory localDir
                else id
-      go $ runPlan localDir remoteUri lc args
+      go $ runPlan localDir remoteUri args
