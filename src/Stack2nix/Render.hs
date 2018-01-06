@@ -5,35 +5,43 @@ module Stack2nix.Render
 import qualified Data.Set as Set
 import           Control.Monad                           (when)
 import           Data.Either                             (rights, lefts)
-import           Data.List                               (sort)
 import           Data.Monoid                             ((<>))
 import           System.IO                               (hPutStrLn, stderr)
+import           Stack2nix.Types               (Args (..))
+import qualified Data.Set                      as S
 import           Distribution.Text                       (display)
-import           Distribution.Types.PackageId            ( PackageIdentifier(..))
+import           Distribution.Types.PackageId            (PackageIdentifier(..), pkgName)
 import           Distribution.Types.PackageName          (unPackageName)
-import           Lens.Micro.Extras                       (view)
+import           Lens.Micro.Extras
+import           Lens.Micro
 import           Paths_stack2nix                         (version)
-import           Distribution.Nixpkgs.Haskell.Derivation (Derivation, pkgid, extraFunctionArgs, dependencies)
-import           Distribution.Nixpkgs.Haskell.BuildInfo  (system)
+import           Distribution.Nixpkgs.Haskell.Derivation (Derivation, pkgid, dependencies, testDepends, benchmarkDepends, runHaddock, doCheck, pkgid)
+import           Distribution.Nixpkgs.Haskell.BuildInfo  (system, haskell)
 import           Text.PrettyPrint.HughesPJClass          (semi, nest, pPrint, fcat, punctuate, space, text, Doc, prettyShow, pPrint)
 import qualified Text.PrettyPrint                        as PP
 import           Language.Nix.PrettyPrinting             (disp)
 
-render :: [Either Doc Derivation] -> IO ()
-render results = do
+render :: [Either Doc Derivation] -> Args -> [String]-> IO ()
+render results args locals = do
    let docs = lefts results
    when (length docs > 0) $ do
      hPutStrLn stderr $ show docs
      error "Error(s) happened during cabal2nix generation ^^"
    let drvs = rights results
-   -- doCheck &&~ optDoCheck
-   putStrLn $ (defaultNix $ map renderOne drvs)
 
-renderOne :: Derivation -> Doc
-renderOne drv =
-   nest 6 $ PP.hang (PP.doubleQuotes (text pid) <> " = callPackage") 2 ("(" <> pPrint drv <> ") {" <> text (show args) <> "};")
+   putStrLn $ defaultNix $ map (renderOne args locals) drvs
+
+renderOne :: Args -> [String] -> Derivation -> Doc
+renderOne args locals drv' =
+   nest 6 $ PP.hang (PP.doubleQuotes (text pid) <> " = callPackage") 2 ("(" <> pPrint drv <> ") {" <> text (show pkgs) <> "};")
      where pid = unPackageName $ pkgName $ view pkgid drv
-           args = fcat $ punctuate space [ disp b <> semi | b <- Set.toList $ view system (view dependencies drv) ]
+           pkgs = fcat $ punctuate space [ disp b <> semi | b <- Set.toList $ view system (view dependencies drv) ]
+           drv = drv'
+                 & doCheck .~ (argTest args && isLocal)
+                 & runHaddock .~ (argHaddock args && isLocal)
+                 & benchmarkDepends . haskell .~ S.fromList []
+                 & testDepends . haskell .~ (if (argTest args && isLocal) then (view (testDepends . haskell) drv') else S.fromList [])
+           isLocal = elem pid locals
 
 defaultNix :: [Doc] -> String
 defaultNix drvs = unlines $

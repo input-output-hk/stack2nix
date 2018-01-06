@@ -9,8 +9,6 @@ module Stack2nix
   ) where
 
 import           Control.Monad              (unless, void)
-import           Data.Char                  (toLower)
-import           Data.Fix                   (Fix (..))
 import           Data.List                  (foldl', isInfixOf, isSuffixOf,
                                              sort, union, (\\))
 import qualified Data.Map.Strict            as Map
@@ -36,7 +34,6 @@ import           System.Environment         (getEnv)
 import           System.FilePath            (dropExtension, isAbsolute,
                                              normalise, takeDirectory,
                                              takeFileName, (<.>), (</>))
-import           System.FilePath.Glob       (glob)
 import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
@@ -89,15 +86,4 @@ stack2nix args@Args{..} = do
       let go = if isJust remoteUri
                then withCurrentDirectory localDir
                else id
-      go $ do
-        bc <- lcLoadBuildConfig lc Nothing -- compiler
-        withSystemTempDirectory "s2n" $ \outDir -> do
-          let packages = filter (\p -> case p of
-                                         PLIndex _          -> False
-                                         PLOther (PLRepo _) -> True
-                                         _ -> error $ "Unsupported build config dependency: " ++ show p) (bcDependencies bc)
-          runPlan localDir outDir remoteUri (map toPackageRef packages) lc args
-
-toPackageRef :: PackageLocationIndex Subdirs -> PackageRef
-toPackageRef (PLOther (PLRepo repo)) = RepoPackage repo
-toPackageRef p = error $ "Unsupported package location index: " ++ show p
+      go $ runPlan localDir remoteUri lc args
