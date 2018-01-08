@@ -56,7 +56,7 @@ genNixFile args baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
     NonHackagePackage _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage (PackageIdentifierRevision pkg rev) -> do
+    HackagePackage (PackageIdentifierRevision pkg _) -> do
       cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
     NonHackagePackage _ident (PLRepo repo) ->
       cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
