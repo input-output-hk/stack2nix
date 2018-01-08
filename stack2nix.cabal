@@ -28,7 +28,6 @@ library
                      , mtl
                      , microlens
                      , optparse-applicative >= 0.13.2 && < 0.14
-                     , path
                      , pretty
                      , language-nix
                      , process >= 1.4.3 && < 1.5

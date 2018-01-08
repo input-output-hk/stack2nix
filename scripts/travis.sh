@@ -5,8 +5,8 @@ scriptDir=$(dirname -- "$($readlink -f -- "${BASH_SOURCE[0]}")")
 source $scriptDir/init-env.sh
 
 # build and install
-\time stack --nix --system-ghc install --fast #--ghc-options="+RTS -A128m -n2m -RTS"
-\time stack --nix --system-ghc test #--ghc-options="+RTS -A128m -n2m -RTS"
+\time stack --nix install --fast --ghc-options="+RTS -A128m -n2m -RTS"
+\time stack --nix test --fast --ghc-options="+RTS -A128m -n2m -RTS"
 
 # SMOKE TESTS
 
