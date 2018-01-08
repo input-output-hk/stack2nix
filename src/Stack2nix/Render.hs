@@ -69,7 +69,11 @@ render results args locals = do
    let missing = sort $ S.toList $ S.difference basePackages $ S.fromList (map drvToName drvs)
    let renderedMissing = map (\b -> nest 6 (text (b <> " = null;"))) missing
 
-   putStrLn $ defaultNix $ renderedMissing ++ map (renderOne args locals) drvs
+   let out = defaultNix $ renderedMissing ++ map (renderOne args locals) drvs
+
+   case argOutFile args of
+     Just fname -> writeFile fname out
+     Nothing -> putStrLn out
 
 renderOne :: Args -> [String] -> Derivation -> Doc
 renderOne args locals drv' =
