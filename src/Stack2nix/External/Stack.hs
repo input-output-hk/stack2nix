@@ -129,7 +129,7 @@ globalOpts currentDir stackRoot Args{..} =
                   , ["--jobs", show argThreads]
                   , ["--test" | argTest]
                   , ["--haddock" | argHaddock]
-                  , ["--nix"]
+                  , ["--no-install-ghc"]
                   ]
     go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
 
