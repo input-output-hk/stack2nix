@@ -124,8 +124,7 @@ globalOpts currentDir stackRoot Args{..} =
      }
   where
     pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
-    args = concat [ ["--work-dir", "./.s2n"]
-                  , ["--stack-root", stackRoot]
+    args = concat [ ["--stack-root", stackRoot]
                   , ["--jobs", show argThreads]
                   , ["--test" | argTest]
                   , ["--haddock" | argHaddock]
