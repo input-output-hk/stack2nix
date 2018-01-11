@@ -33,7 +33,7 @@ import           Stack2nix.External.Cabal2nix  (cabal2nix)
 import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Render              (render)
 import           Stack2nix.Types               (Args (..))
-import           Stack2nix.Util                (mapPool)
+import           Stack2nix.Util                (mapPool, logDebug)
 import           System.Directory              (canonicalizePath,
                                                 createDirectoryIfMissing,
                                                 getCurrentDirectory,
@@ -86,7 +86,7 @@ planAndGenerate :: HasEnvConfig env
 planAndGenerate boptsCli baseDir remoteUri args@Args{..} = do
   (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
   let pkgs = sourceMapToPackages sourceMap
-  liftIO $ hPutStrLn stderr $ "plan:\n" ++ show pkgs
+  liftIO $ logDebug args $ "plan:\n" ++ show pkgs
 
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
   drvs <- liftIO $ mapPool argThreads (genNixFile args baseDir remoteUri argRev hackageDB) pkgs
