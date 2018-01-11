@@ -26,7 +26,13 @@ import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
-  checkRuntimeDeps
+  ensureExecutableExists "cabal" "cabal-install"
+  ensureExecutableExists "git" "git"
+  ensureExecutableExists "nix-prefetch-git" "nix-prefetch-scripts"
+  ensureExecutableExists "ghc" "haskell.compiler.ghc802"
+  assertMinVer "git" "2"
+  assertMinVer "cabal" "2"
+  assertMinVer "ghc" "8.0"
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
@@ -40,11 +46,6 @@ stack2nix args@Args{..} = do
   else withSystemTempDirectory "s2n-" $ \tmpDir ->
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
-    checkRuntimeDeps :: IO ()
-    checkRuntimeDeps = do
-      assertMinVer "git" "2"
-      assertMinVer "cabal" "2"
-
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex =
       getEnv "HOME" >>= \home -> void $ runCmdFrom home "cabal" ["update"]

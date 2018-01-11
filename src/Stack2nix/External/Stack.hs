@@ -9,7 +9,6 @@ import           Control.Applicative           ((<|>))
 import           Data.List                     (concat)
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
-import qualified Data.Set                      as S
 import           Data.Text                     (pack, unpack)
 import           Options.Applicative
 import           Stack.Build.Source            (loadSourceMapFull)

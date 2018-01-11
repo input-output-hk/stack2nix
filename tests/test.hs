@@ -13,3 +13,5 @@ main = hspec $ do
       extractVersion "git version 2.11.0 (Apple Git-81)" `shouldBe` Just (makeVersion [2, 11, 0])
     it "cabal2nix version extraction" $ do
       extractVersion "cabal2nix 2.7" `shouldBe` Just (makeVersion [2, 7])
+    it "ghc version extraction" $ do
+      extractVersion "The Glorious Glasgow Haskell Compilation System, version 8.0.2" `shouldBe` Just (makeVersion [8, 0, 2])
