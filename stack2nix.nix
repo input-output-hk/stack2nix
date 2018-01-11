@@ -77,8 +77,8 @@ let
            pname = "Agda";
            version = "2.5.3";
            sha256 = "aa14d4a3582013100f71e64d71c5deff6caa2a286083e20fc16f6dbb0fdf0065";
-           revision = "3";
-           editedCabalFile = "1hd1viy4wj7fyskjmmf5hqziyvk5qxjr0zcnbp5zdyacng0yyafi";
+           revision = "2";
+           editedCabalFile = "1vh1v5410wji5r8445rf9h0qd94kz7dkq4pmqcrk3ra75klp4sc9";
            isLibrary = true;
            isExecutable = true;
            enableSeparateDataOutput = true;
@@ -6662,9 +6662,9 @@ inherit (pkgs) mesa;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "cabal-helper" = callPackage
-        ({ mkDerivation, base, bytestring, Cabal, cabal-install, containers
-         , directory, filepath, ghc-prim, mtl, process, stdenv
-         , template-haskell, temporary, transformers, utf8-string
+        ({ mkDerivation, base, bytestring, Cabal, containers, directory
+         , filepath, ghc-prim, mtl, process, stdenv, template-haskell
+         , temporary, transformers, utf8-string
          }:
          mkDerivation {
            pname = "cabal-helper";
@@ -6685,7 +6685,6 @@ inherit (pkgs) mesa;};
              base bytestring Cabal directory filepath ghc-prim mtl process
              template-haskell temporary transformers utf8-string
            ];
-           testToolDepends = [ cabal-install ];
            doHaddock = false;
            doCheck = false;
            description = "Simple interface to some of Cabal's configuration state used by ghc-mod";
@@ -16831,8 +16830,8 @@ inherit (pkgs) which;};
          , network, network-uri, optparse-applicative, pandoc
          , pandoc-citeproc, parsec, process, random, regex-base, regex-tdfa
          , resourcet, scientific, stdenv, system-filepath, tagsoup, text
-         , time, time-locale-compat, unordered-containers, utillinux, vector
-         , wai, wai-app-static, warp, yaml
+         , time, time-locale-compat, unordered-containers, vector, wai
+         , wai-app-static, warp, yaml
          }:
          mkDerivation {
            pname = "hakyll";
@@ -16851,7 +16850,6 @@ inherit (pkgs) which;};
              wai-app-static warp yaml
            ];
            executableHaskellDepends = [ base directory filepath ];
-           testToolDepends = [ utillinux ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://jaspervdj.be/hakyll";
@@ -18764,14 +18762,13 @@ inherit (pkgs) which;};
            license = stdenv.lib.licenses.gpl3;
          }) {};
       "hlibgit2" = callPackage
-        ({ mkDerivation, base, bindings-DSL, git, openssl, stdenv, zlib }:
+        ({ mkDerivation, base, bindings-DSL, openssl, stdenv, zlib }:
          mkDerivation {
            pname = "hlibgit2";
            version = "0.18.0.16";
            sha256 = "199e4027faafe0a39d18ca3168923d44c57b386b960c72398df1c0fb7eff8e5e";
            libraryHaskellDepends = [ base bindings-DSL zlib ];
            librarySystemDepends = [ openssl ];
-           testToolDepends = [ git ];
            doHaddock = false;
            doCheck = false;
            description = "Low-level bindings to libgit2";
@@ -18903,32 +18900,6 @@ inherit (pkgs) which;};
            description = "Haskell binding to the MPFR library";
            license = stdenv.lib.licenses.bsd3;
          }) {inherit (pkgs) mpfr;};
-      "hnix" = callPackage
-        ({ mkDerivation, ansi-wl-pprint, base, containers, data-fix
-         , deepseq, deriving-compat, parsers, semigroups, stdenv, text
-         , transformers, trifecta, unordered-containers
-         }:
-         mkDerivation {
-           pname = "hnix";
-           version = "0.3.4";
-           sha256 = "ec890845cc8a782ff8a2e7a2dcbaf763d5ddb3ff202293f701828d04a85adbf2";
-           revision = "1";
-           editedCabalFile = "01svkjznkz51742k3hcc0ssz5m0kymk53ydrdwg4a24ygvb408iw";
-           isLibrary = true;
-           isExecutable = true;
-           libraryHaskellDepends = [
-             ansi-wl-pprint base containers data-fix deepseq deriving-compat
-             parsers semigroups text transformers trifecta unordered-containers
-           ];
-           executableHaskellDepends = [
-             ansi-wl-pprint base containers data-fix deepseq
-           ];
-           doHaddock = false;
-           doCheck = false;
-           homepage = "http://github.com/jwiegley/hnix";
-           description = "Haskell implementation of the Nix language";
-           license = stdenv.lib.licenses.bsd3;
-         }) {};
       "hoauth2" = callPackage
         ({ mkDerivation, aeson, base, bytestring, containers, exceptions
          , http-conduit, http-types, microlens, stdenv, text
@@ -18968,7 +18939,6 @@ inherit (pkgs) which;};
            ];
            librarySystemDepends = [ ocilib ];
            libraryToolDepends = [ c2hs ];
-           testSystemDepends = [ ocilib ];
            doHaddock = false;
            doCheck = false;
            homepage = "https://github.com/fpinsight/hocilib";
@@ -20224,8 +20194,6 @@ inherit (pkgs) which;};
            pname = "http-api-data";
            version = "0.3.7.1";
            sha256 = "8c633e95113c8ab655f4ba67e51e41a2c9035f0122ea68bfbb876b37277075fd";
-           revision = "1";
-           editedCabalFile = "0g57k71bssf81yba6xf9fcxlys8m5ax5kvrs4gvckahf5ihdxds6";
            setupHaskellDepends = [ base Cabal cabal-doctest ];
            libraryHaskellDepends = [
              attoparsec attoparsec-iso8601 base bytestring containers hashable
@@ -23081,8 +23049,6 @@ inherit (pkgs) which;};
            pname = "lens-family-th";
            version = "0.5.0.1";
            sha256 = "fa37572374dc69fc859c023864654704d490160b579a51434ae22208cbe93703";
-           revision = "1";
-           editedCabalFile = "190jxqskd61irc97zb95h08zlkszlhpik4zmb7y4vk7x06zz00m6";
            libraryHaskellDepends = [ base template-haskell ];
            doHaddock = false;
            doCheck = false;
@@ -26586,13 +26552,12 @@ inherit (pkgs) which;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "newtype-generics" = callPackage
-        ({ mkDerivation, base, hspec-discover, stdenv, transformers }:
+        ({ mkDerivation, base, stdenv, transformers }:
          mkDerivation {
            pname = "newtype-generics";
            version = "0.5.1";
            sha256 = "273f429691ae550a77ee1cf42d7f2213c6a51ea581721945c3b599ff54d9a9b2";
            libraryHaskellDepends = [ base transformers ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            description = "A typeclass and set of functions for working with newtypes, with generics support";
@@ -31603,8 +31568,8 @@ inherit (pkgs) which;};
            pname = "rest-client";
            version = "0.5.1.1";
            sha256 = "5da423c9f2c87b9b9797ea331c5f248408e5f863d460dfd94b3408249729f663";
-           revision = "2";
-           editedCabalFile = "0issr73rbnyaqfgx4c0wsy9sq948sqrkima2cr2sb1lkf8n4ihr8";
+           revision = "1";
+           editedCabalFile = "1q7ad9lhlszbmdv5r9zzqj9c3rh9x5hlrl4dyb4wb0xf0v3bj3kx";
            libraryHaskellDepends = [
              aeson-utils base bytestring case-insensitive data-default
              exceptions http-client http-conduit http-types hxt hxt-pickle-utils
@@ -31751,8 +31716,8 @@ inherit (pkgs) which;};
            pname = "rest-wai";
            version = "0.2.0.1";
            sha256 = "38205eb7b85a4e052f11db099dd65e9d952b8533d1a35001f0b1958b443c0d02";
-           revision = "2";
-           editedCabalFile = "1n3sd3vszi0ifw098jf2yan8xcnrxckr22jssl61k0vn74573hw3";
+           revision = "1";
+           editedCabalFile = "1j2n7bypgjajwsaahvp50cdwrl7y0nbv67bd3kfdq03yvz5s1py3";
            libraryHaskellDepends = [
              base base-compat bytestring case-insensitive containers http-types
              mime-types mtl rest-core text unordered-containers wai
@@ -32884,9 +32849,9 @@ inherit (pkgs) which;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "servant-js" = callPackage
-        ({ mkDerivation, aeson, base, base-compat, charset, filepath
-         , hspec-discover, lens, servant, servant-foreign, servant-server
-         , stdenv, stm, text, transformers, warp
+        ({ mkDerivation, aeson, base, base-compat, charset, filepath, lens
+         , servant, servant-foreign, servant-server, stdenv, stm, text
+         , transformers, warp
          }:
          mkDerivation {
            pname = "servant-js";
@@ -32901,7 +32866,6 @@ inherit (pkgs) which;};
              aeson base filepath lens servant servant-server stm transformers
              warp
            ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://haskell-servant.readthedocs.org/";
@@ -32924,9 +32888,8 @@ inherit (pkgs) which;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "servant-mock" = callPackage
-        ({ mkDerivation, aeson, base, bytestring, hspec-discover
-         , http-types, QuickCheck, servant, servant-server, stdenv
-         , transformers, wai, warp
+        ({ mkDerivation, aeson, base, bytestring, http-types, QuickCheck
+         , servant, servant-server, stdenv, transformers, wai, warp
          }:
          mkDerivation {
            pname = "servant-mock";
@@ -32943,7 +32906,6 @@ inherit (pkgs) which;};
            executableHaskellDepends = [
              aeson base QuickCheck servant-server warp
            ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://haskell-servant.readthedocs.org/";
@@ -32988,11 +32950,11 @@ inherit (pkgs) which;};
       "servant-server" = callPackage
         ({ mkDerivation, aeson, attoparsec, base, base-compat
          , base64-bytestring, bytestring, Cabal, cabal-doctest, containers
-         , exceptions, filepath, hspec-discover, http-api-data, http-types
-         , monad-control, mtl, network, network-uri, resourcet, safe
-         , servant, split, stdenv, string-conversions, system-filepath
-         , tagged, text, transformers, transformers-base
-         , transformers-compat, wai, wai-app-static, warp, word8
+         , exceptions, filepath, http-api-data, http-types, monad-control
+         , mtl, network, network-uri, resourcet, safe, servant, split
+         , stdenv, string-conversions, system-filepath, tagged, text
+         , transformers, transformers-base, transformers-compat, wai
+         , wai-app-static, warp, word8
          }:
          mkDerivation {
            pname = "servant-server";
@@ -33009,7 +32971,6 @@ inherit (pkgs) which;};
              transformers-base transformers-compat wai wai-app-static warp word8
            ];
            executableHaskellDepends = [ aeson base servant text wai warp ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://haskell-servant.readthedocs.org/";
@@ -34653,9 +34614,8 @@ inherit (pkgs) which;};
       "stack2nix" = callPackage
         ({ mkDerivation, async, base, Cabal, cabal2nix, containers
          , directory, distribution-nixpkgs, filepath, language-nix
-         , microlens, mtl, optparse-applicative, path, pretty, process
-         , regex-pcre, SafeSemaphore, stack, stdenv, tasty, tasty-hunit
-         , temporary, text, time
+         , microlens, optparse-applicative, pretty, process, regex-pcre
+         , SafeSemaphore, stack, stdenv, temporary, text, time
          }:
          mkDerivation {
            pname = "stack2nix";
@@ -34665,15 +34625,15 @@ inherit (pkgs) which;};
            isExecutable = true;
            libraryHaskellDepends = [
              async base Cabal cabal2nix containers directory
-             distribution-nixpkgs filepath language-nix microlens mtl
-             optparse-applicative path pretty process regex-pcre SafeSemaphore
-             stack temporary text time
+             distribution-nixpkgs filepath language-nix microlens
+             optparse-applicative pretty process regex-pcre SafeSemaphore stack
+             temporary text time
            ];
            executableHaskellDepends = [
              base Cabal optparse-applicative time
            ];
-           testHaskellDepends = [ base tasty tasty-hunit ];
            doHaddock = false;
+           doCheck = false;
            description = "Convert stack.yaml files into Nix build instructions.";
            license = stdenv.lib.licenses.mit;
          }) {};
@@ -35587,10 +35547,10 @@ inherit (pkgs) which;};
          }) {};
       "swagger2" = callPackage
         ({ mkDerivation, aeson, base, base-compat, bytestring, Cabal
-         , cabal-doctest, containers, generics-sop, hashable, hspec-discover
-         , http-media, insert-ordered-containers, lens, mtl, network
-         , scientific, stdenv, template-haskell, text, time, transformers
-         , transformers-compat, unordered-containers, uuid-types, vector
+         , cabal-doctest, containers, generics-sop, hashable, http-media
+         , insert-ordered-containers, lens, mtl, network, scientific, stdenv
+         , template-haskell, text, time, transformers, transformers-compat
+         , unordered-containers, uuid-types, vector
          }:
          mkDerivation {
            pname = "swagger2";
@@ -35603,7 +35563,6 @@ inherit (pkgs) which;};
              template-haskell text time transformers transformers-compat
              unordered-containers uuid-types vector
            ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            homepage = "https://github.com/GetShopTV/swagger2";
@@ -35639,19 +35598,18 @@ inherit (pkgs) which;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "symengine" = callPackage
-        ({ mkDerivation, base, gmp, gmpxx, stdenv, symengine }:
+        ({ mkDerivation, base, stdenv }:
          mkDerivation {
            pname = "symengine";
            version = "0.1.2.0";
            sha256 = "0a59f76a924686ae84b1873c8783eb80f6e4092c90f3c971340053c1e6ca82f4";
            libraryHaskellDepends = [ base ];
-           testSystemDepends = [ gmp gmpxx symengine ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://github.com/symengine/symengine.hs#readme";
            description = "SymEngine symbolic mathematics engine for Haskell";
            license = stdenv.lib.licenses.mit;
-         }) {inherit (pkgs) gmp; inherit (pkgs) gmpxx; inherit (pkgs) symengine;};
+         }) {};
       "synthesizer-core" = callPackage
         ({ mkDerivation, array, base, binary, bytestring, containers
          , deepseq, event-list, explicit-exception, filepath, non-empty
@@ -37988,19 +37946,17 @@ inherit (pkgs) which;};
          }) {};
       "trifecta" = callPackage
         ({ mkDerivation, ansi-terminal, ansi-wl-pprint, array, base
-         , blaze-builder, blaze-html, blaze-markup, bytestring, Cabal
-         , cabal-doctest, charset, comonad, containers, deepseq, fingertree
-         , ghc-prim, hashable, lens, mtl, parsers, profunctors, reducers
-         , semigroups, stdenv, transformers, unordered-containers
-         , utf8-string
+         , blaze-builder, blaze-html, blaze-markup, bytestring, charset
+         , comonad, containers, deepseq, fingertree, ghc-prim, hashable
+         , lens, mtl, parsers, profunctors, reducers, semigroups, stdenv
+         , transformers, unordered-containers, utf8-string
          }:
          mkDerivation {
            pname = "trifecta";
-           version = "1.7.1.1";
-           sha256 = "61f8753368fa0c7673b44c4e4c4dede00916f68b3f3b68a5fef6d9dedc50c68e";
-           revision = "2";
-           editedCabalFile = "1pbywxk2aw0bkhkhhcdqhxnkvyxxnrj13qahlzf2ivd5awmynmqp";
-           setupHaskellDepends = [ base Cabal cabal-doctest ];
+           version = "1.6.2.1";
+           sha256 = "bab3724de8ed4f5283deb99013debf2e223e9e2c3c975e7d9b9bd44a9b30fbe5";
+           revision = "1";
+           editedCabalFile = "0qy2nqxn2h20fp9gf5chvgimb2281pjwm075ap7ar7pk2k4n8ljr";
            libraryHaskellDepends = [
              ansi-terminal ansi-wl-pprint array base blaze-builder blaze-html
              blaze-markup bytestring charset comonad containers deepseq
@@ -38181,10 +38137,10 @@ inherit (pkgs) which;};
       "twitter-conduit" = callPackage
         ({ mkDerivation, aeson, attoparsec, authenticate-oauth, base
          , bytestring, Cabal, cabal-doctest, conduit, conduit-extra
-         , containers, data-default, exceptions, hspec-discover, http-client
-         , http-conduit, http-types, lens, lens-aeson, resourcet, stdenv
-         , template-haskell, text, time, transformers, transformers-base
-         , twitter-types, twitter-types-lens
+         , containers, data-default, exceptions, http-client, http-conduit
+         , http-types, lens, lens-aeson, resourcet, stdenv, template-haskell
+         , text, time, transformers, transformers-base, twitter-types
+         , twitter-types-lens
          }:
          mkDerivation {
            pname = "twitter-conduit";
@@ -38198,7 +38154,6 @@ inherit (pkgs) which;};
              text time transformers transformers-base twitter-types
              twitter-types-lens
            ];
-           testToolDepends = [ hspec-discover ];
            doHaddock = false;
            doCheck = false;
            homepage = "https://github.com/himura/twitter-conduit";
@@ -42853,7 +42808,7 @@ inherit (pkgs) which;};
       "zip-archive" = callPackage
         ({ mkDerivation, array, base, binary, bytestring, containers
          , digest, directory, filepath, mtl, old-time, pretty, stdenv, text
-         , time, unix, zip, zlib
+         , time, unix, zlib
          }:
          mkDerivation {
            pname = "zip-archive";
@@ -42868,7 +42823,6 @@ inherit (pkgs) which;};
              mtl old-time pretty text time unix zlib
            ];
            executableHaskellDepends = [ base bytestring directory ];
-           testToolDepends = [ zip ];
            doHaddock = false;
            doCheck = false;
            homepage = "http://github.com/jgm/zip-archive";
