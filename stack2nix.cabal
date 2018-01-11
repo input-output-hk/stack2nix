@@ -22,16 +22,13 @@ library
                      , async >= 2.1.1.1 && < 2.2
                      , cabal2nix >= 2.7 && < 2.8
                      , containers >= 0.5.7.1 && < 0.6
-                     , data-fix >= 0.0.4
                      , directory >= 1.3 && < 1.4
                      , distribution-nixpkgs >= 1.1 && < 1.2
                      , filepath >= 1.4.1.1 && < 1.5
-                     , Glob >= 0.7.14 && < 0.9
-                     , hnix >= 0.3.4 && < 0.4
-                     , mtl
                      , microlens
                      , optparse-applicative >= 0.13.2 && < 0.14
-                     , path
+                     , pretty
+                     , language-nix
                      , process >= 1.4.3 && < 1.5
                      , regex-pcre >= 0.94.4 && < 0.95
                      , SafeSemaphore >= 0.10.1 && < 0.11
@@ -42,6 +39,7 @@ library
   exposed-modules:     Stack2nix
                      , Stack2nix.Types
                      , Stack2nix.Util
+                     , Stack2nix.Render
   other-modules:       Stack2nix.External.Cabal2nix
                      , Stack2nix.External.Stack
                      , Stack2nix.External.VCS.Git
@@ -72,6 +70,5 @@ test-suite test
     test.hs
   build-depends:
       base >= 4 && < 5
-    , tasty >= 0.11.3 && < 0.12
-    , tasty-hunit >= 0.9.2 && < 0.10
+    , hspec
     , stack2nix

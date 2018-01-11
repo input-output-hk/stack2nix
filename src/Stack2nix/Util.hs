@@ -3,6 +3,7 @@ module Stack2nix.Util
   , extractVersion
   , mapPool
   , logDebug
+  , ensureExecutableExists
   ) where
 
 import           Control.Concurrent.Async
@@ -13,11 +14,15 @@ import           Data.Maybe                   (listToMaybe)
 import qualified Data.Traversable             as T
 import           Data.Version                 (Version (..), parseVersion,
                                                showVersion)
+import           Data.Text                    (pack, strip, unpack)
 import           GHC.Exts                     (sortWith)
 import           Stack2nix.External.Util      (runCmd)
 import           Stack2nix.Types              (Args, argVerbose)
+import           System.Directory             (findExecutable)
+import           System.Environment           (getEnv, setEnv)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hPutStrLn, stderr)
+import           System.Process               (readProcessWithExitCode)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Text.Regex.PCRE              (AllTextMatches (..),
                                                getAllTextMatches, (=~))
@@ -51,3 +56,18 @@ logDebug :: Args -> String -> IO ()
 logDebug args msg
   | argVerbose args = hPutStrLn stderr msg
   | otherwise = return ()
+
+
+ensureExecutableExists :: String -> String -> IO ()
+ensureExecutableExists executable nixAttr = do
+  exec <- findExecutable executable
+  case exec of
+    Just _ -> return ()
+    Nothing -> do
+      (exitcode2, stdout, err2) <- readProcessWithExitCode "nix-build" ["-A", nixAttr, "<nixpkgs>"] mempty
+      case exitcode2 of
+        ExitSuccess -> do
+          hPutStrLn stderr $ err2
+          path <- getEnv "PATH"
+          setEnv "PATH" (path ++ ":" ++ unpack (strip (pack stdout)) ++ "/bin")
+        ExitFailure _ -> error $ nixAttr ++ " failed to build via nix"

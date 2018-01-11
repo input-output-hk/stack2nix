@@ -7,10 +7,10 @@ source $scriptDir/init-env.sh
 set -xe
 
 fail_stack2nix_check() {
-  echo "ERROR: you need to run 'stack2nix . > stack2nix.nix' and commit the changes" >&2
+  echo "ERROR: you need to run './scripts/check-nix-is-updated.sh' and commit the changes" >&2
   exit 1
 }
 
-\time ~/.local/bin/stack2nix . > $scriptDir/../stack2nix.nix
+\time ~/.local/bin/stack2nix --hackage-snapshot 2018-01-01T08:56:04Z . > $scriptDir/../stack2nix.nix
 
 git diff --text --exit-code || fail_stack2nix_check
