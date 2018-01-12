@@ -1,0 +1,43 @@
+# Changelog
+
+## Unreleased changes
+
+Major changes:
+
+- Use full stackage snapshot instead of relying on the build plan #83
+- Get rid of hnix and rely on Derivation type
+- Use nix to provision executables if missing #83
+
+Other enhancements:
+
+- Support --platform to set targeting system generation #79
+- Use cabal2nix and stack as haskell libraries instead of relying on executable parsing #75
+- Add --verbose flag #78
+- Be able to pin down hackage snapshot #75
+- Optimize cabal2nix calls by reusing HackageDB #75
+- Rewrite tests in hspec to reduce dependencies #83
+
+Bug fixes:
+
+- Be able to override GHC core packages #51
+- Cleanup concurrency #33
+- Add --haddock #38
+- Add --test #35
+- Support Stack subdirs #10
+- Correct version parsing #67
+
+## v0.1.3.0 (2017-07-27)
+
+Bug fixes:
+
+- Apply only Nix overrides without version fixes #26
+
+## v0.1.2.0 (2017-06-22)
+
+Bug fixes:
+
+- Minor stack2nix.cabal improvements
+
+## v0.1.1.0 (2017-06-22)
+
+Initial public release.

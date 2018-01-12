@@ -8,7 +8,9 @@ author:              Jacob Mitchell
 maintainer:          jacob.mitchell@iohk.io
 category:            Distribution, Nix
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files: 
+  README.md
+  ChangeLog.md
 cabal-version:       >= 1.10
 
 source-repository head
