@@ -14,11 +14,9 @@
 
 ## Installation
 
-There are three options. The first is to install stack2nix and its dependencies on your machine directly, and the second is to use the supported virtual machine configuration.
+There are three options. The first - using Nix is recommended. If there are difficulties please file an issue.
 
-If there are difficulties please file an issue. Generally the virtual machine approach should be more reliable.
-
-## Nix
+## Nix (recommended)
 
 1. Install [Nix](https://nixos.org/nix/).
 2. Clone this repo.
