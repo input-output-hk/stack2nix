@@ -57,8 +57,8 @@ basePackages = S.fromList
   , "xhtml"
   ]
 
-render :: [Either Doc Derivation] -> Args -> [String]-> IO ()
-render results args locals = do
+render :: [Either Doc Derivation] -> Args -> [String] -> String -> IO ()
+render results args locals ghcnixversion = do
    let docs = lefts results
    when (length docs > 0) $ do
      hPutStrLn stderr $ show docs
@@ -69,7 +69,7 @@ render results args locals = do
    let missing = sort $ S.toList $ S.difference basePackages $ S.fromList (map drvToName drvs)
    let renderedMissing = map (\b -> nest 6 (text (b <> " = null;"))) missing
 
-   let out = defaultNix $ renderedMissing ++ map (renderOne args locals) drvs
+   let out = defaultNix ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
 
    case argOutFile args of
      Just fname -> writeFile fname out
@@ -99,14 +99,14 @@ renderOne args locals drv' =
 drvToName :: Derivation -> String
 drvToName drv = unPackageName $ pkgName $ view pkgid drv
 
-defaultNix :: [Doc] -> String
-defaultNix drvs = unlines $
+defaultNix :: String -> [Doc] -> String
+defaultNix ghcnixversion drvs = unlines $
  [ "# Generated using stack2nix " <> display version <> "."
  , "#"
  , "# Only works with sufficiently recent nixpkgs, e.g. \"NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz\"."
  , ""
  , "{ pkgs ? (import <nixpkgs> {})"
- , ", compiler ? pkgs.haskell.packages.ghc802"
+ , ", compiler ? pkgs.haskell.packages.ghc" ++ ghcnixversion
  , "}:"
  , ""
  , "with pkgs.haskell.lib;"

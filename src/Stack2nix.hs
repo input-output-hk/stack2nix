@@ -29,10 +29,8 @@ stack2nix args@Args{..} = do
   ensureExecutableExists "cabal" "cabal-install"
   ensureExecutableExists "git" "git"
   ensureExecutableExists "nix-prefetch-git" "nix-prefetch-scripts"
-  ensureExecutableExists "ghc" "haskell.compiler.ghc802"
   assertMinVer "git" "2"
   assertMinVer "cabal" "2"
-  assertMinVer "ghc" "8.0"
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
