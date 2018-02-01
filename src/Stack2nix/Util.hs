@@ -4,6 +4,7 @@ module Stack2nix.Util
   , mapPool
   , logDebug
   , ensureExecutableExists
+  , ensureExecutable
   ) where
 
 import           Control.Concurrent.Async
@@ -58,16 +59,21 @@ logDebug args msg
   | otherwise = return ()
 
 
+-- check if executable is present, if not provision it with nix
 ensureExecutableExists :: String -> String -> IO ()
 ensureExecutableExists executable nixAttr = do
   exec <- findExecutable executable
   case exec of
     Just _ -> return ()
-    Nothing -> do
-      (exitcode2, stdout, err2) <- readProcessWithExitCode "nix-build" ["-A", nixAttr, "<nixpkgs>"] mempty
-      case exitcode2 of
-        ExitSuccess -> do
-          hPutStrLn stderr $ err2
-          path <- getEnv "PATH"
-          setEnv "PATH" (path ++ ":" ++ unpack (strip (pack stdout)) ++ "/bin")
-        ExitFailure _ -> error $ nixAttr ++ " failed to build via nix"
+    Nothing -> ensureExecutable nixAttr
+
+-- given nixAttr, build it and add $out/bin to $PATH
+ensureExecutable :: String -> IO ()
+ensureExecutable nixAttr = do
+  (exitcode2, stdout, err2) <- readProcessWithExitCode "nix-build" ["-A", nixAttr, "<nixpkgs>", "--no-build-output", "--no-out-link"] mempty
+  case exitcode2 of
+    ExitSuccess -> do
+      hPutStrLn stderr $ err2
+      path <- getEnv "PATH"
+      setEnv "PATH" (unpack (strip (pack stdout)) ++ "/bin" ++ ":" ++ path)
+    ExitFailure _ -> error $ nixAttr ++ " failed to build via nix"

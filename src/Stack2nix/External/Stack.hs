@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE DataKinds         #-}
 
 module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
@@ -15,11 +16,15 @@ import           Stack.Build.Source            (loadSourceMapFull)
 import           Stack.Build.Target            (NeedTargets (..))
 import           Stack.Options.BuildParser
 import           Stack.Options.GlobalParser
+import           Stack.Config
+import           Path                          (parseAbsFile)
+import           Stack.Types.Compiler          (CVType(..), CompilerVersion, getGhcVersion)
 import           Stack.Options.Utils           (GlobalOptsContext (..))
-import           Stack.Prelude                 hiding (mapConcurrently, logDebug)
+import           Stack.Prelude                 hiding (logDebug)
 import           Stack.Types.BuildPlan         (Repo (..), PackageLocation (..))
-import           Stack.Runners                 (withBuildConfig)
+import           Stack.Runners                 (withBuildConfig, loadCompilerVersion)
 import           Stack.Types.Config
+import           Stack.Types.Runner
 import           Stack.Types.Config.Build      (BuildCommand (..))
 import           Stack.Types.Nix
 import           Stack.Types.Package           (PackageSource (..), lpPackage,
@@ -30,16 +35,14 @@ import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
                                                 packageIdentifierString,
                                                 PackageIdentifierRevision (..))
 import           Stack2nix.External.Cabal2nix  (cabal2nix)
-import           Stack2nix.External.Util       (failHard, runCmd)
 import           Stack2nix.Render              (render)
 import           Stack2nix.Types               (Args (..))
-import           Stack2nix.Util                (mapPool, logDebug)
+import           Stack2nix.Util                (mapPool, logDebug, ensureExecutable)
 import           System.Directory              (canonicalizePath,
                                                 createDirectoryIfMissing,
                                                 getCurrentDirectory,
                                                 makeRelativeToCurrentDirectory)
 import           System.FilePath               (makeRelative, (</>))
-import           System.IO                     (hPutStrLn, stderr)
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
 import           Text.PrettyPrint.HughesPJClass (Doc)
@@ -55,7 +58,7 @@ genNixFile args baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
     NonHackagePackage _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage (PackageIdentifierRevision pkg _) -> do
+    HackagePackage (PackageIdentifierRevision pkg _) ->
       cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
     NonHackagePackage _ident (PLRepo repo) ->
       cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
@@ -82,8 +85,9 @@ planAndGenerate :: HasEnvConfig env
                 -> FilePath
                 -> Maybe String
                 -> Args
+                -> String
                 -> RIO env ()
-planAndGenerate boptsCli baseDir remoteUri args@Args{..} = do
+planAndGenerate boptsCli baseDir remoteUri args@Args{..} ghcnixversion = do
   (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
   let pkgs = sourceMapToPackages sourceMap
   liftIO $ logDebug args $ "plan:\n" ++ show pkgs
@@ -91,7 +95,7 @@ planAndGenerate boptsCli baseDir remoteUri args@Args{..} = do
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
   drvs <- liftIO $ mapPool argThreads (genNixFile args baseDir remoteUri argRev hackageDB) pkgs
   let locals = map (\l -> show (packageName (lpPackage l))) _locals
-  liftIO $ render drvs args locals
+  liftIO $ render drvs args locals ghcnixversion
 
 runPlan :: FilePath
         -> Maybe String
@@ -101,7 +105,22 @@ runPlan baseDir remoteUri args@Args{..} = do
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
   let globals = globalOpts baseDir stackRoot args
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args
+  let stackFile = baseDir </> "stack.yaml"
+
+  ghcVersion <- getGhcVersionIO globals stackFile
+  let ghcnixversion = filter (/= '.') $ show (getGhcVersion ghcVersion)
+  ensureExecutable ("haskell.compiler.ghc" ++ ghcnixversion)
+  withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcnixversion
+
+
+getGhcVersionIO :: GlobalOpts -> FilePath -> IO (CompilerVersion 'CVWanted)
+getGhcVersionIO go stackFile = do
+  cp <- canonicalizePath stackFile
+  fp <- parseAbsFile cp
+  lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->
+    -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
+    runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
+  loadCompilerVersion go lc
 
 {-
   TODO:
