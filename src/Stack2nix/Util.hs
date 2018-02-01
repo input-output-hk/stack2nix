@@ -70,7 +70,7 @@ ensureExecutableExists executable nixAttr = do
 -- given nixAttr, build it and add $out/bin to $PATH
 ensureExecutable :: String -> IO ()
 ensureExecutable nixAttr = do
-  (exitcode2, stdout, err2) <- readProcessWithExitCode "nix-build" ["-A", nixAttr, "<nixpkgs>"] mempty
+  (exitcode2, stdout, err2) <- readProcessWithExitCode "nix-build" ["-A", nixAttr, "<nixpkgs>", "--no-build-output"] mempty
   case exitcode2 of
     ExitSuccess -> do
       hPutStrLn stderr $ err2
