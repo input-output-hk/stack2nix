@@ -34614,8 +34614,8 @@ inherit (pkgs) which;};
       "stack2nix" = callPackage
         ({ mkDerivation, async, base, Cabal, cabal2nix, containers
          , directory, distribution-nixpkgs, filepath, language-nix
-         , microlens, optparse-applicative, pretty, process, regex-pcre
-         , SafeSemaphore, stack, stdenv, temporary, text, time
+         , microlens, optparse-applicative, path, pretty, process
+         , regex-pcre, SafeSemaphore, stack, stdenv, temporary, text, time
          }:
          mkDerivation {
            pname = "stack2nix";
@@ -34626,8 +34626,8 @@ inherit (pkgs) which;};
            libraryHaskellDepends = [
              async base Cabal cabal2nix containers directory
              distribution-nixpkgs filepath language-nix microlens
-             optparse-applicative pretty process regex-pcre SafeSemaphore stack
-             temporary text time
+             optparse-applicative path pretty process regex-pcre SafeSemaphore
+             stack temporary text time
            ];
            executableHaskellDepends = [
              base Cabal optparse-applicative time
