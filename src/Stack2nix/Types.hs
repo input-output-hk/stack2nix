@@ -13,5 +13,6 @@ data Args = Args
   , argPlatform        :: Platform
   , argUri             :: String
   , argVerbose         :: Bool
+  , argStackYaml       :: String
   }
   deriving (Show)
