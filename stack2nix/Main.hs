@@ -14,6 +14,7 @@ args :: Parser Args
 args = Args
        <$> optional (strOption $ long "revision" <> help "revision to use when fetching from VCS")
        <*> optional (strOption $ short 'o' <> help "output file for generated nix expression" <> metavar "PATH")
+       <*> strOption (long "stack-yaml" <> help "Override project stack.yaml file" <> showDefault <> value "stack.yaml")
        <*> option auto (short 'j' <> help "number of threads for subprocesses" <> showDefault <> value 4 <> metavar "INT")
        <*> switch (long "test" <> help "enable tests")
        <*> switch (long "haddock" <> help "enable documentation generation")

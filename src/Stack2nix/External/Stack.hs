@@ -105,7 +105,7 @@ runPlan baseDir remoteUri args@Args{..} = do
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
   let globals = globalOpts baseDir stackRoot args
-  let stackFile = baseDir </> "stack.yaml"
+  let stackFile = baseDir </> argStackYaml
 
   ghcVersion <- getGhcVersionIO globals stackFile
   let ghcnixversion = filter (/= '.') $ show (getGhcVersion ghcVersion)
@@ -138,6 +138,7 @@ globalOpts currentDir stackRoot Args{..} =
            { nixMonoidEnable = First (Just True)
            }
          }
+     , globalStackYaml = SYLOverride (currentDir </> argStackYaml)
      , globalLogLevel = if argVerbose then LevelDebug else LevelInfo
      }
   where
