@@ -22,6 +22,7 @@ args = Args
        <*> option (readP platformReader) (long "platform" <> help "target platform to use when invoking stack or cabal2nix" <> value buildPlatform <> showDefaultWith display)
        <*> strArgument (metavar "URI")
        <*> switch (long "verbose" <> help "verbose output")
+       <*> strOption (long "stack-yaml" <> help "stack yaml file to parse" <> value "stack.yaml")
   where
     -- | A parser for the date. Hackage updates happen maybe once or twice a month.
     -- Example: parseTime defaultTimeLocale "%FT%T%QZ" "2017-11-20T12:18:35Z" :: Maybe UTCTime
