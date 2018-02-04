@@ -6,6 +6,7 @@ import Distribution.System (Platform)
 data Args = Args
   { argRev             :: Maybe String
   , argOutFile         :: Maybe FilePath
+  , argStackYaml       :: FilePath
   , argThreads         :: Int
   , argTest            :: Bool
   , argHaddock         :: Bool

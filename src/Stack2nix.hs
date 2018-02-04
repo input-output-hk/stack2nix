@@ -35,7 +35,7 @@ stack2nix args@Args{..} = do
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
   let projRoot = argUri
-  isLocalRepo <- doesFileExist $ projRoot </> "stack.yaml"
+  isLocalRepo <- doesFileExist $ projRoot </> argStackYaml
   logDebug args $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
   logDebug args $ "stack2nix (projRoot): " ++ show projRoot
   logDebug args $ "stack2nix (argUri): " ++ show argUri
@@ -61,7 +61,7 @@ stack2nix args@Args{..} = do
       logDebug args $ "handleStackConfig (cwd): " ++ cwd
       logDebug args $ "handleStackConfig (localDir): " ++ localDir
       logDebug args $ "handleStackConfig (remoteUri): " ++ show remoteUri
-      let stackFile = localDir </> "stack.yaml"
+      let stackFile = localDir </> argStackYaml
       alreadyExists <- doesFileExist stackFile
       unless alreadyExists $ error $ stackFile <> " does not exist. Use 'stack init' to create it."
       logDebug args $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
