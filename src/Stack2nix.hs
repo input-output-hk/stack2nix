@@ -20,7 +20,7 @@ import           Stack2nix.Types            (Args (..))
 import           Stack2nix.Util
 import           System.Directory           (doesFileExist,
                                              getCurrentDirectory, withCurrentDirectory)
-import           System.Environment         (getEnv)
+import           System.Environment         (getEnv, setEnv)
 import           System.FilePath            ((</>))
 import           System.IO.Temp             (withSystemTempDirectory)
 
@@ -31,6 +31,7 @@ stack2nix args@Args{..} = do
   ensureExecutableExists "nix-prefetch-git" "nix-prefetch-scripts"
   assertMinVer "git" "2"
   assertMinVer "cabal" "2"
+  setEnv "GIT_QUIET" "y"
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
