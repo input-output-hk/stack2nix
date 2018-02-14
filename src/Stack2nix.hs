@@ -13,7 +13,7 @@ import           Data.Maybe                 (isJust)
 import           Data.Monoid                ((<>))
 import           Paths_stack2nix            (version)
 import           Stack2nix.External.Stack
-import           Stack2nix.External.Util    (runCmdFrom)
+import           Stack2nix.External.Util    (runCmdFrom, failHard)
 import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           Stack2nix.Types            (Args (..))
@@ -46,8 +46,10 @@ stack2nix args@Args{..} = do
     tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
   where
     updateCabalPackageIndex :: IO ()
-    updateCabalPackageIndex =
-      getEnv "HOME" >>= \home -> void $ runCmdFrom home "cabal" ["update"]
+    updateCabalPackageIndex = do
+      home <- getEnv "HOME"
+      out <- runCmdFrom home "cabal" ["update"]
+      void $ failHard out
 
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do

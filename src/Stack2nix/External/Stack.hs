@@ -6,7 +6,6 @@ module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
   ) where
 
-import           Control.Applicative           ((<|>))
 import           Data.List                     (concat)
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                    (fromJust)
@@ -112,7 +111,6 @@ runPlan baseDir remoteUri args@Args{..} = do
   ensureExecutable ("haskell.compiler.ghc" ++ ghcnixversion)
   withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcnixversion
 
-
 getGhcVersionIO :: GlobalOpts -> FilePath -> IO (CompilerVersion 'CVWanted)
 getGhcVersionIO go stackFile = do
   cp <- canonicalizePath stackFile
@@ -121,13 +119,6 @@ getGhcVersionIO go stackFile = do
     -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
     runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
   loadCompilerVersion go lc
-
-{-
-  TODO:
-  - replace "ghc" in package list with value encoding compiler version
-  - handle custom shell.nix  (see mshellFile in Stack.Nix.runShellAndExit)
-  - remove baseDir arguments; due to withCurrentDirectory it should always be PWD.
--}
 
 globalOpts :: FilePath -> FilePath -> Args -> GlobalOpts
 globalOpts currentDir stackRoot Args{..} =
