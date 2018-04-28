@@ -14,5 +14,6 @@ data Args = Args
   , argPlatform        :: Platform
   , argUri             :: String
   , argVerbose         :: Bool
+  , argGitRecursive    :: Bool
   }
   deriving (Show)

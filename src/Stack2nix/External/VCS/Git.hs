@@ -6,11 +6,17 @@ module Stack2nix.External.VCS.Git
 import           Stack2nix.External.Util (failHard, runCmd, runCmdFrom)
 import           System.Exit             (ExitCode (..))
 
-data Command = OutsideRepo ExternalCmd
-             | InsideRepo FilePath InternalCmd
-data ExternalCmd = Clone String FilePath
+data Command
+  = OutsideRepo ExternalCmd
+  | InsideRepo FilePath InternalCmd
+
+data ExternalCmd
+  = Clone RepoUri FilePath
+  | CloneRecursive RepoUri FilePath
+
 data InternalCmd = Checkout CommitRef
 
+type RepoUri = String
 type CommitRef = String
 
 exe :: String
@@ -24,6 +30,8 @@ git (InsideRepo dir cmd) = runInternal dir cmd
 runExternal :: ExternalCmd -> IO (ExitCode, String, String)
 runExternal (Clone uri dir) =
   runCmd exe ["clone", uri, dir] >>= failHard
+runExternal (CloneRecursive uri dir) =
+  runCmd exe ["clone", uri, "--recursive", dir] >>= failHard
 
 runInternal :: FilePath -> InternalCmd -> IO (ExitCode, String, String)
 runInternal repoDir (Checkout ref) =

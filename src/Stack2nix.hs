@@ -53,7 +53,10 @@ stack2nix args@Args{..} = do
 
     tryGit :: FilePath -> IO ()
     tryGit tmpDir = do
-      void $ git $ OutsideRepo $ Clone argUri tmpDir
+      let externalCmd = if argGitRecursive
+                          then CloneRecursive argUri tmpDir
+                          else Clone argUri tmpDir
+      void $ git $ OutsideRepo externalCmd
       case argRev of
         Just r  -> void $ git $ InsideRepo tmpDir (Checkout r)
         Nothing -> return mempty
