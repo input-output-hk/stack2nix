@@ -6,6 +6,7 @@ module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
   ) where
 
+import           Control.Lens                                   ((%~))
 import           Data.List                                      (concat)
 import qualified Data.Map.Strict                                as M
 import           Data.Maybe                                     (fromJust)
@@ -16,7 +17,6 @@ import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
                                                                  configureFlags)
 import qualified Distribution.Nixpkgs.Haskell.Hackage           as DB
 import           Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
-import           Lens.Micro
 import           Options.Applicative
 import           Path                                           (parseAbsFile)
 import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
@@ -180,6 +180,7 @@ globalOpts currentDir stackRoot Args{..} =
     args = concat [ ["--stack-root", stackRoot]
                   , ["--jobs", show argThreads]
                   , ["--test" | argTest]
+                  , ["--bench" | argBench]
                   , ["--haddock" | argHaddock]
                   , ["--no-install-ghc"]
                   ]

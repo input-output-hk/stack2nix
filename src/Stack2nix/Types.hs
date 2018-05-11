@@ -1,7 +1,7 @@
 module Stack2nix.Types where
 
-import Data.Time (UTCTime)
-import Distribution.System (Platform)
+import           Data.Time           (UTCTime)
+import           Distribution.System (Platform)
 
 data Args = Args
   { argRev             :: Maybe String
@@ -9,6 +9,7 @@ data Args = Args
   , argStackYaml       :: FilePath
   , argThreads         :: Int
   , argTest            :: Bool
+  , argBench           :: Bool
   , argHaddock         :: Bool
   , argHackageSnapshot :: Maybe UTCTime
   , argPlatform        :: Platform
