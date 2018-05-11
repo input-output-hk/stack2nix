@@ -7,8 +7,8 @@ import           Data.Either                             (lefts, rights)
 import           Data.List                               (filter, isPrefixOf,
                                                           sort)
 import           Data.Monoid                             ((<>))
+import           Data.Set                                (Set)
 import qualified Data.Set                                as Set
-import qualified Data.Set                                as S
 import           Distribution.Nixpkgs.Haskell.BuildInfo  (haskell, pkgconfig,
                                                           system, tool)
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation,
@@ -35,8 +35,8 @@ import           Text.PrettyPrint.HughesPJClass          (Doc, fcat, nest,
 
 
 -- TODO: this only covers GHC 8.0.2
-basePackages :: S.Set String
-basePackages = S.fromList
+basePackages :: Set String
+basePackages = Set.fromList
   [ "array"
   , "base"
   , "binary"
@@ -74,7 +74,7 @@ render results args locals ghcnixversion = do
    let drvs = rights results
 
    -- See what base packages are missing in the derivations list and null them
-   let missing = sort $ S.toList $ S.difference basePackages $ S.fromList (map drvToName drvs)
+   let missing = sort $ Set.toList $ Set.difference basePackages $ Set.fromList (map drvToName drvs)
    let renderedMissing = map (\b -> nest 6 (text (b <> " = null;"))) missing
 
    let out = defaultNix ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
@@ -96,12 +96,12 @@ renderOne args locals drv' =
            drv = drv'
                  & doCheck .~ (argTest args && isLocal)
                  & runHaddock .~ (argHaddock args && isLocal)
-                 & benchmarkDepends . haskell .~ S.empty
+                 & benchmarkDepends . haskell .~ Set.empty
                  -- find a DRY way
-                 & testDepends . haskell .~ (if (argTest args && isLocal) then (view (testDepends . haskell) drv') else S.empty)
-                 & testDepends . pkgconfig .~ (if (argTest args && isLocal) then (view (testDepends . pkgconfig) drv') else S.empty)
-                 & testDepends . system .~ (if (argTest args && isLocal) then (view (testDepends . system) drv') else S.empty)
-                 & testDepends . tool .~ (if (argTest args && isLocal) then (view (testDepends . tool) drv') else S.empty)
+                 & testDepends . haskell .~ (if (argTest args && isLocal) then (view (testDepends . haskell) drv') else Set.empty)
+                 & testDepends . pkgconfig .~ (if (argTest args && isLocal) then (view (testDepends . pkgconfig) drv') else Set.empty)
+                 & testDepends . system .~ (if (argTest args && isLocal) then (view (testDepends . system) drv') else Set.empty)
+                 & testDepends . tool .~ (if (argTest args && isLocal) then (view (testDepends . tool) drv') else Set.empty)
            isLocal = elem pid locals
 
 drvToName :: Derivation -> String

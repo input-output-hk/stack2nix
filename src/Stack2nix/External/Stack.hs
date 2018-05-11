@@ -9,8 +9,8 @@ module Stack2nix.External.Stack
 import           Data.List                                      (concat)
 import qualified Data.Map.Strict                                as M
 import           Data.Maybe                                     (fromJust)
-import qualified Data.Set                                       as S (fromList,
-                                                                      union)
+import qualified Data.Set                                       as Set (fromList,
+                                                                        union)
 import           Data.Text                                      (pack, unpack)
 import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
                                                                  configureFlags)
@@ -124,15 +124,16 @@ planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcnixversion = do
 --   by adding to the configureFlags attribute of the derivation
 addGhcOptions :: BuildConfig -> PackageRef -> Derivation -> Derivation
 addGhcOptions buildConf pkgRef drv =
-  drv & configureFlags %~ (S.union stackGhcOptions)
+  drv & configureFlags %~ (Set.union stackGhcOptions)
  where
   stackGhcOptions :: Set String
   stackGhcOptions =
-    S.fromList . map (unpack . ("--ghc-option=" <>)) $ getGhcOptions buildConf
-                                                                     buildOpts
-                                                                     pkgName
-                                                                     False
-                                                                     False
+    Set.fromList . map (unpack . ("--ghc-option=" <>)) $ getGhcOptions
+      buildConf
+      buildOpts
+      pkgName
+      False
+      False
   pkgName :: PackageName
   pkgName = case pkgRef of
     HackagePackage (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
