@@ -34621,6 +34621,7 @@ inherit (pkgs) which;};
            pname = "stack2nix";
            version = "0.1.3.1";
            src = ./.;
+           configureFlags = [ "--ghc-option=-Werror" ];
            isLibrary = true;
            isExecutable = true;
            libraryHaskellDepends = [

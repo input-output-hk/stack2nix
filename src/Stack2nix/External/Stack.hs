@@ -1,51 +1,65 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE DataKinds         #-}
 
 module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
   ) where
 
-import           Data.List                     (concat)
-import qualified Data.Map.Strict               as M
-import           Data.Maybe                    (fromJust)
-import           Data.Text                     (pack, unpack)
+import           Data.List                                      (concat)
+import qualified Data.Map.Strict                                as M
+import           Data.Maybe                                     (fromJust)
+import qualified Data.Set                                       as Set (fromList,
+                                                                        union)
+import           Data.Text                                      (pack, unpack)
+import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
+                                                                 configureFlags)
+import qualified Distribution.Nixpkgs.Haskell.Hackage           as DB
+import           Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
+import           Lens.Micro
 import           Options.Applicative
-import           Stack.Build.Source            (loadSourceMapFull)
-import           Stack.Build.Target            (NeedTargets (..))
+import           Path                                           (parseAbsFile)
+import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
+import           Stack.Build.Target                             (NeedTargets (..))
+import           Stack.Config
 import           Stack.Options.BuildParser
 import           Stack.Options.GlobalParser
-import           Stack.Config
-import           Path                          (parseAbsFile)
-import           Stack.Types.Compiler          (CVType(..), CompilerVersion, getGhcVersion)
-import           Stack.Options.Utils           (GlobalOptsContext (..))
-import           Stack.Prelude                 hiding (logDebug)
-import           Stack.Types.BuildPlan         (Repo (..), PackageLocation (..))
-import           Stack.Runners                 (withBuildConfig, loadCompilerVersion)
+import           Stack.Options.Utils                            (GlobalOptsContext (..))
+import           Stack.Prelude                                  hiding
+                                                                 (logDebug)
+import           Stack.Runners                                  (loadCompilerVersion,
+                                                                 withBuildConfig)
+import           Stack.Types.BuildPlan                          (PackageLocation (..),
+                                                                 Repo (..))
+import           Stack.Types.Compiler                           (CVType (..),
+                                                                 CompilerVersion,
+                                                                 getGhcVersion)
 import           Stack.Types.Config
-import           Stack.Types.Runner
-import           Stack.Types.Config.Build      (BuildCommand (..))
+import           Stack.Types.Config.Build                       (BuildCommand (..))
 import           Stack.Types.Nix
-import           Stack.Types.Package           (PackageSource (..), lpPackage,
-                                                packageName,
-                                                packageVersion, lpLocation)
-import           Stack.Types.PackageName       (PackageName)
-import           Stack.Types.PackageIdentifier (PackageIdentifier (..),
-                                                packageIdentifierString,
-                                                PackageIdentifierRevision (..))
-import           Stack2nix.External.Cabal2nix  (cabal2nix)
-import           Stack2nix.Render              (render)
-import           Stack2nix.Types               (Args (..))
-import           Stack2nix.Util                (mapPool, logDebug, ensureExecutable)
-import           System.Directory              (canonicalizePath,
-                                                createDirectoryIfMissing,
-                                                getCurrentDirectory,
-                                                makeRelativeToCurrentDirectory)
-import           System.FilePath               (makeRelative, (</>))
-import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
-import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
-import           Text.PrettyPrint.HughesPJClass (Doc)
-import           Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
+import           Stack.Types.Package                            (PackageSource (..),
+                                                                 lpLocation,
+                                                                 lpPackage,
+                                                                 packageName,
+                                                                 packageVersion)
+import           Stack.Types.PackageIdentifier                  (PackageIdentifier (..),
+                                                                 PackageIdentifierRevision (..),
+                                                                 packageIdentifierString)
+import           Stack.Types.PackageName                        (PackageName)
+import           Stack.Types.Runner
+import           Stack2nix.External.Cabal2nix                   (cabal2nix)
+import           Stack2nix.Render                               (render)
+import           Stack2nix.Types                                (Args (..))
+import           Stack2nix.Util                                 (ensureExecutable,
+                                                                 logDebug,
+                                                                 mapPool)
+import           System.Directory                               (canonicalizePath,
+                                                                 createDirectoryIfMissing,
+                                                                 getCurrentDirectory,
+                                                                 makeRelativeToCurrentDirectory)
+import           System.FilePath                                (makeRelative,
+                                                                 (</>))
+import           Text.PrettyPrint.HughesPJClass                 (Doc)
 
 data PackageRef
   = HackagePackage PackageIdentifierRevision
@@ -79,22 +93,51 @@ sourceMapToPackages = map sourceToPackage . M.elems
        in NonHackagePackage ident (lpLocation lp)
 
 
-planAndGenerate :: HasEnvConfig env
-                => BuildOptsCLI
-                -> FilePath
-                -> Maybe String
-                -> Args
-                -> String
-                -> RIO env ()
-planAndGenerate boptsCli baseDir remoteUri args@Args{..} ghcnixversion = do
-  (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+planAndGenerate
+  :: HasEnvConfig env
+  => BuildOptsCLI
+  -> FilePath
+  -> Maybe String
+  -> Args
+  -> String
+  -> RIO env ()
+planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcnixversion = do
+  (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
+    NeedTargets
+    boptsCli
   let pkgs = sourceMapToPackages sourceMap
   liftIO $ logDebug args $ "plan:\n" ++ show pkgs
 
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
-  drvs <- liftIO $ mapPool argThreads (genNixFile args baseDir remoteUri argRev hackageDB) pkgs
+  buildConf <- envConfigBuildConfig <$> view envConfigL
+  drvs      <- liftIO $ mapPool
+    argThreads
+    (\p ->
+      fmap (addGhcOptions buildConf p)
+        <$> genNixFile args baseDir remoteUri argRev hackageDB p
+    )
+    pkgs
   let locals = map (\l -> show (packageName (lpPackage l))) _locals
   liftIO $ render drvs args locals ghcnixversion
+
+-- | Add ghc-options declared in stack.yaml to the nix derivation for a package
+--   by adding to the configureFlags attribute of the derivation
+addGhcOptions :: BuildConfig -> PackageRef -> Derivation -> Derivation
+addGhcOptions buildConf pkgRef drv =
+  drv & configureFlags %~ (Set.union stackGhcOptions)
+ where
+  stackGhcOptions :: Set String
+  stackGhcOptions =
+    Set.fromList . map (unpack . ("--ghc-option=" <>)) $ getGhcOptions
+      buildConf
+      buildOpts
+      pkgName
+      False
+      False
+  pkgName :: PackageName
+  pkgName = case pkgRef of
+    HackagePackage (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
+    NonHackagePackage (PackageIdentifier n _) _                          -> n
 
 runPlan :: FilePath
         -> Maybe String
