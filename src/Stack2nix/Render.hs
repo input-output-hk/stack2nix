@@ -1,7 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+
 module Stack2nix.Render
    (render) where
 
+import           Control.Lens
 import           Control.Monad                           (when)
 import           Data.Either                             (lefts, rights)
 import           Data.List                               (filter, isPrefixOf,
@@ -23,8 +28,6 @@ import           Distribution.Types.PackageName          (unPackageName)
 import           Language.Nix                            (path)
 import           Language.Nix.Binding                    (Binding, reference)
 import           Language.Nix.PrettyPrinting             (disp)
-import           Lens.Micro
-import           Lens.Micro.Extras
 import           Paths_stack2nix                         (version)
 import           Stack2nix.Types                         (Args (..))
 import           System.IO                               (hPutStrLn, stderr)
@@ -84,25 +87,48 @@ render results args locals ghcnixversion = do
      Nothing    -> putStrLn out
 
 renderOne :: Args -> [String] -> Derivation -> Doc
-renderOne args locals drv' =
-   nest 6 $ PP.hang (PP.doubleQuotes (text pid) <> " = callPackage") 2 ("(" <> pPrint drv <> ") {" <> text (show pkgs) <> "};")
-     where pid = drvToName drv
-           deps = view dependencies drv
-           nixPkgs :: [Binding]
-           nixPkgs = Set.toList $ Set.union (view pkgconfig deps) (view system deps)
-           -- filter out libX stuff to prevent breakage in generated set
-           nonXpkgs = filter (\e -> not ("libX" `Data.List.isPrefixOf` (display (((view (reference . path) e) !! 1))))) nixPkgs
-           pkgs = fcat $ punctuate space [ disp b <> semi | b <- nonXpkgs ]
-           drv = drv'
-                 & doCheck .~ (argTest args && isLocal)
-                 & runHaddock .~ (argHaddock args && isLocal)
-                 & benchmarkDepends . haskell .~ Set.empty
-                 -- find a DRY way
-                 & testDepends . haskell .~ (if (argTest args && isLocal) then (view (testDepends . haskell) drv') else Set.empty)
-                 & testDepends . pkgconfig .~ (if (argTest args && isLocal) then (view (testDepends . pkgconfig) drv') else Set.empty)
-                 & testDepends . system .~ (if (argTest args && isLocal) then (view (testDepends . system) drv') else Set.empty)
-                 & testDepends . tool .~ (if (argTest args && isLocal) then (view (testDepends . tool) drv') else Set.empty)
-           isLocal = elem pid locals
+renderOne args locals drv' = nest 6 $ PP.hang
+  (PP.doubleQuotes (text pid) <> " = callPackage")
+  2
+  ("(" <> pPrint drv <> ") {" <> text (show pkgs) <> "};")
+ where
+  pid  = drvToName drv
+  deps = view dependencies drv
+  nixPkgs :: [Binding]
+  nixPkgs  = Set.toList $ Set.union (view pkgconfig deps) (view system deps)
+  -- filter out libX stuff to prevent breakage in generated set
+  nonXpkgs = filter
+    (\e -> not
+      (                      "libX"
+      `Data.List.isPrefixOf` (display (((view (reference . path) e) !! 1)))
+      )
+    )
+    nixPkgs
+  pkgs = fcat $ punctuate space [ disp b <> semi | b <- nonXpkgs ]
+  drv =
+    filterDepends args isLocal drv'
+      &  doCheck
+      .~ (argTest args && isLocal)
+      &  runHaddock
+      .~ (argHaddock args && isLocal)
+  isLocal = elem pid locals
+
+filterDepends :: Args -> Bool -> Derivation -> Derivation
+filterDepends args isLocal drv = drv & foldr
+  (.)
+  id
+  (do
+    (depend, predicate) <-
+      [(Lens testDepends, argTest args), (Lens benchmarkDepends, argBench args)]
+    binding <- [Lens haskell, Lens pkgconfig, Lens system, Lens tool]
+    pure
+      $  runLens depend
+      .  runLens binding
+      .~ (if predicate && isLocal
+           then view (runLens depend . runLens binding) drv
+           else Set.empty
+         )
+  )
 
 drvToName :: Derivation -> String
 drvToName drv = unPackageName $ pkgName $ view pkgid drv

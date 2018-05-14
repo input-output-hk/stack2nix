@@ -8,7 +8,7 @@ author:              Jacob Mitchell
 maintainer:          jacob.mitchell@iohk.io
 category:            Distribution, Nix
 build-type:          Simple
-extra-source-files: 
+extra-source-files:
   README.md
   ChangeLog.md
 cabal-version:       >= 1.10
@@ -27,11 +27,11 @@ library
                      , directory >= 1.3 && < 1.4
                      , distribution-nixpkgs >= 1.1 && < 1.2
                      , filepath >= 1.4.1.1 && < 1.5
-                     , microlens
                      , optparse-applicative >= 0.13.2 && < 0.14
                      , pretty
                      , path
                      , language-nix
+                     , lens
                      , process >= 1.4.3 && < 1.5
                      , regex-pcre >= 0.94.4 && < 0.95
                      , SafeSemaphore >= 0.10.1 && < 0.11
