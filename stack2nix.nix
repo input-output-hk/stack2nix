@@ -34613,19 +34613,20 @@ inherit (pkgs) which;};
          }) {};
       "stack2nix" = callPackage
         ({ mkDerivation, async, base, Cabal, cabal2nix, containers
-         , directory, distribution-nixpkgs, filepath, language-nix
-         , microlens, optparse-applicative, path, pretty, process
-         , regex-pcre, SafeSemaphore, stack, stdenv, temporary, text, time
+         , directory, distribution-nixpkgs, filepath, language-nix, lens
+         , optparse-applicative, path, pretty, process, regex-pcre
+         , SafeSemaphore, stack, stdenv, temporary, text, time
          }:
          mkDerivation {
            pname = "stack2nix";
            version = "0.1.3.1";
            src = ./.;
+           configureFlags = [ "--ghc-option=-Werror" ];
            isLibrary = true;
            isExecutable = true;
            libraryHaskellDepends = [
              async base Cabal cabal2nix containers directory
-             distribution-nixpkgs filepath language-nix microlens
+             distribution-nixpkgs filepath language-nix lens
              optparse-applicative path pretty process regex-pcre SafeSemaphore
              stack temporary text time
            ];

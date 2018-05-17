@@ -1,34 +1,45 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+
 module Stack2nix.Render
    (render) where
 
-import qualified Data.Set as Set
+import           Control.Lens
 import           Control.Monad                           (when)
-import           Data.Either                             (rights, lefts)
-import           Data.List                               (sort, isPrefixOf, filter)
+import           Data.Either                             (lefts, rights)
+import           Data.List                               (filter, isPrefixOf,
+                                                          sort)
 import           Data.Monoid                             ((<>))
-import qualified Data.Set                                as S
+import           Data.Set                                (Set)
+import qualified Data.Set                                as Set
+import           Distribution.Nixpkgs.Haskell.BuildInfo  (haskell, pkgconfig,
+                                                          system, tool)
+import           Distribution.Nixpkgs.Haskell.Derivation (Derivation,
+                                                          benchmarkDepends,
+                                                          dependencies, doCheck,
+                                                          pkgid, runHaddock,
+                                                          testDepends)
 import           Distribution.Text                       (display)
-import           System.IO                               (hPutStrLn, stderr)
-import           Stack2nix.Types                         (Args (..))
-import           Distribution.Text                       (display)
-import           Distribution.Types.PackageId            (PackageIdentifier(..), pkgName)
+import           Distribution.Types.PackageId            (PackageIdentifier (..),
+                                                          pkgName)
 import           Distribution.Types.PackageName          (unPackageName)
-import           Lens.Micro.Extras
-import           Lens.Micro
-import           Paths_stack2nix                         (version)
-import           Distribution.Nixpkgs.Haskell.Derivation (Derivation, pkgid, dependencies, testDepends, benchmarkDepends, runHaddock, doCheck, pkgid)
-import           Distribution.Nixpkgs.Haskell.BuildInfo  (system, haskell, pkgconfig, tool)
-import           Text.PrettyPrint.HughesPJClass          (semi, nest, pPrint, fcat, punctuate, space, text, Doc, prettyShow, pPrint)
-import qualified Text.PrettyPrint                        as PP
-import           Language.Nix.Binding                    (Binding, reference)
 import           Language.Nix                            (path)
+import           Language.Nix.Binding                    (Binding, reference)
 import           Language.Nix.PrettyPrinting             (disp)
+import           Paths_stack2nix                         (version)
+import           Stack2nix.Types                         (Args (..))
+import           System.IO                               (hPutStrLn, stderr)
+import qualified Text.PrettyPrint                        as PP
+import           Text.PrettyPrint.HughesPJClass          (Doc, fcat, nest,
+                                                          pPrint, punctuate,
+                                                          semi, space, text)
 
 
 -- TODO: this only covers GHC 8.0.2
-basePackages :: S.Set String
-basePackages = S.fromList
+basePackages :: Set String
+basePackages = Set.fromList
   [ "array"
   , "base"
   , "binary"
@@ -66,35 +77,58 @@ render results args locals ghcnixversion = do
    let drvs = rights results
 
    -- See what base packages are missing in the derivations list and null them
-   let missing = sort $ S.toList $ S.difference basePackages $ S.fromList (map drvToName drvs)
+   let missing = sort $ Set.toList $ Set.difference basePackages $ Set.fromList (map drvToName drvs)
    let renderedMissing = map (\b -> nest 6 (text (b <> " = null;"))) missing
 
    let out = defaultNix ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
 
    case argOutFile args of
      Just fname -> writeFile fname out
-     Nothing -> putStrLn out
+     Nothing    -> putStrLn out
 
 renderOne :: Args -> [String] -> Derivation -> Doc
-renderOne args locals drv' =
-   nest 6 $ PP.hang (PP.doubleQuotes (text pid) <> " = callPackage") 2 ("(" <> pPrint drv <> ") {" <> text (show pkgs) <> "};")
-     where pid = drvToName drv
-           deps = view dependencies drv
-           nixPkgs :: [Binding]
-           nixPkgs = Set.toList $ Set.union (view pkgconfig deps) (view system deps)
-           -- filter out libX stuff to prevent breakage in generated set
-           nonXpkgs = filter (\e -> not ("libX" `Data.List.isPrefixOf` (display (((view (reference . path) e) !! 1))))) nixPkgs
-           pkgs = fcat $ punctuate space [ disp b <> semi | b <- nonXpkgs ]
-           drv = drv'
-                 & doCheck .~ (argTest args && isLocal)
-                 & runHaddock .~ (argHaddock args && isLocal)
-                 & benchmarkDepends . haskell .~ S.empty
-                 -- find a DRY way
-                 & testDepends . haskell .~ (if (argTest args && isLocal) then (view (testDepends . haskell) drv') else S.empty)
-                 & testDepends . pkgconfig .~ (if (argTest args && isLocal) then (view (testDepends . pkgconfig) drv') else S.empty)
-                 & testDepends . system .~ (if (argTest args && isLocal) then (view (testDepends . system) drv') else S.empty)
-                 & testDepends . tool .~ (if (argTest args && isLocal) then (view (testDepends . tool) drv') else S.empty)
-           isLocal = elem pid locals
+renderOne args locals drv' = nest 6 $ PP.hang
+  (PP.doubleQuotes (text pid) <> " = callPackage")
+  2
+  ("(" <> pPrint drv <> ") {" <> text (show pkgs) <> "};")
+ where
+  pid  = drvToName drv
+  deps = view dependencies drv
+  nixPkgs :: [Binding]
+  nixPkgs  = Set.toList $ Set.union (view pkgconfig deps) (view system deps)
+  -- filter out libX stuff to prevent breakage in generated set
+  nonXpkgs = filter
+    (\e -> not
+      (                      "libX"
+      `Data.List.isPrefixOf` (display (((view (reference . path) e) !! 1)))
+      )
+    )
+    nixPkgs
+  pkgs = fcat $ punctuate space [ disp b <> semi | b <- nonXpkgs ]
+  drv =
+    filterDepends args isLocal drv'
+      &  doCheck
+      .~ (argTest args && isLocal)
+      &  runHaddock
+      .~ (argHaddock args && isLocal)
+  isLocal = elem pid locals
+
+filterDepends :: Args -> Bool -> Derivation -> Derivation
+filterDepends args isLocal drv = drv & foldr
+  (.)
+  id
+  (do
+    (depend, predicate) <-
+      [(Lens testDepends, argTest args), (Lens benchmarkDepends, argBench args)]
+    binding <- [Lens haskell, Lens pkgconfig, Lens system, Lens tool]
+    pure
+      $  runLens depend
+      .  runLens binding
+      .~ (if predicate && isLocal
+           then view (runLens depend . runLens binding) drv
+           else Set.empty
+         )
+  )
 
 drvToName :: Derivation -> String
 drvToName drv = unPackageName $ pkgName $ view pkgid drv

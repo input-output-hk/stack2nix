@@ -2,12 +2,12 @@ resolver: lts-9.20
 
 packages:
 - '.'
-# https://github.com/peti/hackage-db/pull/7 
+# https://github.com/peti/hackage-db/pull/7
 - location:
    git: https://github.com/domenkozar/hackage-db
    commit: 0b58f1062d0a87b06bbae343d3c5a2f86ba26537
   extra-dep: true
-# https://github.com/NixOS/cabal2nix/pull/322 
+# https://github.com/NixOS/cabal2nix/pull/322
 - location:
    git: https://github.com/NixOS/cabal2nix
    commit: e72fbdfe57941627633006fa1fb4003e26619424
@@ -31,3 +31,6 @@ nix:
   packages: [zlib,gmp,git,pcre,openssl]
 
 extra-package-dbs: []
+
+ghc-options:
+  stack2nix: -Werror

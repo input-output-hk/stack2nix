@@ -1,14 +1,16 @@
 module Main ( main ) where
 
-import           Data.Semigroup      ((<>))
-import           Data.Time           (UTCTime, parseTimeM, defaultTimeLocale)
-import           Distribution.Text   (display)
-import           Distribution.System (Platform(..), Arch(..), OS(..), buildPlatform)
+import           Data.Semigroup            ((<>))
+import           Data.Time                 (UTCTime, defaultTimeLocale,
+                                            parseTimeM)
 import qualified Distribution.Compat.ReadP as P
+import           Distribution.System       (Arch (..), OS (..), Platform (..),
+                                            buildPlatform)
+import           Distribution.Text         (display)
 import           Options.Applicative
 import           Stack2nix
-import           System.IO           (BufferMode (..), hSetBuffering, stderr,
-                                      stdout)
+import           System.IO                 (BufferMode (..), hSetBuffering,
+                                            stderr, stdout)
 
 args :: Parser Args
 args = Args
@@ -17,6 +19,7 @@ args = Args
        <*> strOption (long "stack-yaml" <> help "Override project stack.yaml file" <> showDefault <> value "stack.yaml")
        <*> option auto (short 'j' <> help "number of threads for subprocesses" <> showDefault <> value 4 <> metavar "INT")
        <*> switch (long "test" <> help "enable tests")
+       <*> switch (long "bench" <> help "enable benchmarks")
        <*> switch (long "haddock" <> help "enable documentation generation")
        <*> optional (option utcTimeReader (long "hackage-snapshot" <> help "hackage snapshot time, ISO format"))
        <*> option (readP platformReader) (long "platform" <> help "target platform to use when invoking stack or cabal2nix" <> value buildPlatform <> showDefaultWith display)
