@@ -56,9 +56,14 @@ stack2nix args@Args{..} = do
       let externalCmd = if argGitRecursive
                           then CloneRecursive argUri tmpDir
                           else Clone argUri tmpDir
-      void $ git $ OutsideRepo externalCmd
+      void . git $ OutsideRepo externalCmd
       case argRev of
-        Just r  -> void $ git $ InsideRepo tmpDir (Checkout r)
+        Just rev  ->
+          let internalCmd = if argGitRecursive
+                              then CheckoutRecursive rev 
+                              else Checkout rev
+          in
+            void . git $ InsideRepo tmpDir internalCmd
         Nothing -> return mempty
 
     handleStackConfig :: Maybe String -> FilePath -> IO ()
