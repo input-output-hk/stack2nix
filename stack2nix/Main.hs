@@ -24,6 +24,7 @@ args = Args
        <*> optional (option utcTimeReader (long "hackage-snapshot" <> help "hackage snapshot time, ISO format"))
        <*> option (readP platformReader) (long "platform" <> help "target platform to use when invoking stack or cabal2nix" <> value buildPlatform <> showDefaultWith display)
        <*> strArgument (metavar "URI")
+       <*> flag True False (long "no-indent" <> help "disable indentation and place one item per line")
        <*> switch (long "verbose" <> help "verbose output")
   where
     -- | A parser for the date. Hackage updates happen maybe once or twice a month.

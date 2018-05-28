@@ -30,12 +30,12 @@ import           Language.Nix.Binding                    (Binding, reference)
 import           Language.Nix.PrettyPrinting             (disp)
 import           Paths_stack2nix                         (version)
 import           Stack2nix.Types                         (Args (..))
+import           Stack2nix.PP                            (ppIndented, ppSingletons)
 import           System.IO                               (hPutStrLn, stderr)
 import qualified Text.PrettyPrint                        as PP
 import           Text.PrettyPrint.HughesPJClass          (Doc, fcat, nest,
                                                           pPrint, punctuate,
                                                           semi, space, text)
-
 
 -- TODO: this only covers GHC 8.0.2
 basePackages :: Set String
@@ -79,8 +79,9 @@ render results args locals ghcnixversion = do
    -- See what base packages are missing in the derivations list and null them
    let missing = sort $ Set.toList $ Set.difference basePackages $ Set.fromList (map drvToName drvs)
    let renderedMissing = map (\b -> nest 6 (text (b <> " = null;"))) missing
+   let pp = if argIndent args then ppIndented else ppSingletons
 
-   let out = defaultNix ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
+   let out = defaultNix pp ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
 
    case argOutFile args of
      Just fname -> writeFile fname out
@@ -133,8 +134,8 @@ filterDepends args isLocal drv = drv & foldr
 drvToName :: Derivation -> String
 drvToName drv = unPackageName $ pkgName $ view pkgid drv
 
-defaultNix :: String -> [Doc] -> String
-defaultNix ghcnixversion drvs = unlines $
+defaultNix :: (Doc -> String) -> String -> [Doc] -> String
+defaultNix pp ghcnixversion drvs = unlines $
  [ "# Generated using stack2nix " <> display version <> "."
  , "#"
  , "# Only works with sufficiently recent nixpkgs, e.g. \"NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz\"."
@@ -148,7 +149,7 @@ defaultNix ghcnixversion drvs = unlines $
  , "let"
  , "  stackPackages = { pkgs, stdenv, callPackage }:"
  , "    self: {"
- ] ++ (map PP.render drvs) ++
+ ] ++ (map pp drvs) ++
  [ "    };"
  , "in compiler.override {"
  , "  initialPackages = stackPackages;"
