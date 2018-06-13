@@ -14,6 +14,7 @@ data Args = Args
   , argHackageSnapshot :: Maybe UTCTime
   , argPlatform        :: Platform
   , argUri             :: String
+  , argIndent          :: Bool
   , argVerbose         :: Bool
   , argGitRecursive    :: Bool
   }

@@ -40,9 +40,10 @@ library
                      , text >= 1.2.2.1 && < 1.3
                      , time
   exposed-modules:     Stack2nix
+                     , Stack2nix.PP
+                     , Stack2nix.Render
                      , Stack2nix.Types
                      , Stack2nix.Util
-                     , Stack2nix.Render
   other-modules:       Stack2nix.External.Cabal2nix
                      , Stack2nix.External.Stack
                      , Stack2nix.External.VCS.Git
