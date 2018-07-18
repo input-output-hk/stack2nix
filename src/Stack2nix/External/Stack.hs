@@ -20,7 +20,7 @@ import           Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
 import           Options.Applicative
 import           Path                                           (parseAbsFile)
 import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
-import           Stack.Build.Target                             (NeedTargets (..))
+import           Stack.Build.Target                             (NeedTargets (..), Target)
 import           Stack.Config
 import           Stack.Options.BuildParser
 import           Stack.Options.GlobalParser
@@ -37,7 +37,8 @@ import           Stack.Types.Compiler                           (CVType (..),
 import           Stack.Types.Config
 import           Stack.Types.Config.Build                       (BuildCommand (..))
 import           Stack.Types.Nix
-import           Stack.Types.Package                            (PackageSource (..),
+import           Stack.Types.Package                            (LocalPackage (..),
+                                                                 PackageSource (..),
                                                                  lpLocation,
                                                                  lpPackage,
                                                                  packageName,
@@ -64,6 +65,7 @@ import           Text.PrettyPrint.HughesPJClass                 (Doc)
 data PackageRef
   = HackagePackage PackageIdentifierRevision
   | NonHackagePackage PackageIdentifier (PackageLocation FilePath)
+  | TargetPackage PackageIdentifier FilePath
   deriving (Eq, Show)
 
 genNixFile :: Args -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
@@ -80,14 +82,22 @@ genNixFile args baseDir uri argRev hackageDB pkgRef = do
       projRoot <- canonicalizePath $ cwd </> baseDir
       let defDir = baseDir </> makeRelative projRoot path
       cabal2nix args (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
+    TargetPackage _ident path -> do
+      projRoot <- canonicalizePath $ cwd </> baseDir
+      let relPath = makeRelative projRoot path
+      cabal2nix args baseDir (pack <$> argRev) (Just relPath) hackageDB
 
 -- TODO: remove once we use flags, options
-sourceMapToPackages :: Map PackageName PackageSource -> [PackageRef]
-sourceMapToPackages = map sourceToPackage . M.elems
+sourceMapToPackages :: Map PackageName Target -> Map PackageName PackageSource -> [PackageRef]
+sourceMapToPackages targets = map sourceToPackage . M.toList
   where
-    sourceToPackage :: PackageSource -> PackageRef
-    sourceToPackage (PSIndex _ _flags _options pir) = HackagePackage pir
-    sourceToPackage (PSFiles lp _) =
+    sourceToPackage :: (PackageName, PackageSource) -> PackageRef
+    sourceToPackage (_, (PSIndex _ _flags _options pir)) = HackagePackage pir
+    sourceToPackage (name, (PSFiles lp@(LocalPackage { lpLocation = PLFilePath fp }) _)) | name `M.member` targets =
+      let pkg = lpPackage lp
+          ident = PackageIdentifier (packageName pkg) (packageVersion pkg)
+       in TargetPackage ident fp
+    sourceToPackage (_, (PSFiles lp _)) =
       let pkg = lpPackage lp
           ident = PackageIdentifier (packageName pkg) (packageVersion pkg)
        in NonHackagePackage ident (lpLocation lp)
@@ -102,10 +112,10 @@ planAndGenerate
   -> String
   -> RIO env ()
 planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcnixversion = do
-  (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
+  (targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
     NeedTargets
     boptsCli
-  let pkgs = sourceMapToPackages sourceMap
+  let pkgs = sourceMapToPackages targets sourceMap
   liftIO $ logDebug args $ "plan:\n" ++ show pkgs
 
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
@@ -138,6 +148,7 @@ addGhcOptions buildConf pkgRef drv =
   pkgName = case pkgRef of
     HackagePackage (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
     NonHackagePackage (PackageIdentifier n _) _                          -> n
+    TargetPackage (PackageIdentifier n _) _                              -> n
 
 runPlan :: FilePath
         -> Maybe String
