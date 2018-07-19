@@ -16,7 +16,6 @@ import           Data.Text                                      (pack, unpack)
 import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
                                                                  configureFlags)
 import qualified Distribution.Nixpkgs.Haskell.Hackage           as DB
-import           Distribution.Nixpkgs.Haskell.PackageSourceSpec (loadHackageDB)
 import           Options.Applicative
 import           Path                                           (parseAbsFile)
 import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
@@ -48,6 +47,7 @@ import           Stack.Types.PackageIdentifier                  (PackageIdentifi
 import           Stack.Types.PackageName                        (PackageName)
 import           Stack.Types.Runner
 import           Stack2nix.External.Cabal2nix                   (cabal2nix)
+import           Stack2nix.Hackage                              (loadHackageDB)
 import           Stack2nix.Render                               (render)
 import           Stack2nix.Types                                (Args (..))
 import           Stack2nix.Util                                 (ensureExecutable,

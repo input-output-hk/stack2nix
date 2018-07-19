@@ -1,24 +1,29 @@
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Stack2nix.External.Cabal2nix (
   cabal2nix
   ) where
 
-import           Cabal2nix                   (cabal2nixWithDB)
+import           Cabal2nix                   (cabal2nixWithDB, parseArgs, optNixpkgsIdentifier, Options)
+import           Control.Lens
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (Text, unpack)
-import           Distribution.System         (Platform(..), Arch(..), OS(..))
-import           System.IO                   (hPutStrLn, stderr)
-import           Stack2nix.Types             (Args (..))
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
+import           Distribution.System         (Platform(..), Arch(..), OS(..))
+import           Language.Nix
+import           System.IO                   (hPutStrLn, stderr)
+import           Stack2nix.Types             (Args (..))
+
 import           Text.PrettyPrint.HughesPJClass (Doc)
 
 cabal2nix :: Args -> FilePath -> Maybe Text -> Maybe FilePath -> DB.HackageDB -> IO (Either Doc Derivation)
 cabal2nix Args{..} uri commit subpath hackageDB = do
   let runCmdArgs = args $ fromMaybe "." subpath
   hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
-  cabal2nixWithDB hackageDB runCmdArgs
+  options <- parseArgs runCmdArgs
+  cabal2nixWithDB hackageDB $ cabalOptions options
 
   where
     args :: FilePath -> [String]
@@ -28,6 +33,13 @@ cabal2nix Args{..} uri commit subpath hackageDB = do
       , ["--system", fromCabalPlatform argPlatform]
       , [uri]
       ]
+
+-- Override default nixpkgs resolver to do pkgs.attr instead of attr
+cabalOptions :: Options -> Options
+cabalOptions options =
+  options {
+    optNixpkgsIdentifier = \i -> Just (binding # (i, path # ["pkgs", i]))
+  }
 
 -- | Copied (and modified) from src/Distribution/Nixpkgs/Meta.hs
 fromCabalPlatform :: Platform -> String
