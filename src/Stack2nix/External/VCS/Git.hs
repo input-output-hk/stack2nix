@@ -23,8 +23,11 @@ git (InsideRepo dir cmd) = runInternal dir cmd
 
 runExternal :: ExternalCmd -> IO (ExitCode, String, String)
 runExternal (Clone uri dir) =
-  runCmd exe ["clone", uri, dir] >>= failHard
+  runCmd exe ["clone", "--recurse-submodules", uri, dir] >>= failHard
 
 runInternal :: FilePath -> InternalCmd -> IO (ExitCode, String, String)
-runInternal repoDir (Checkout ref) =
-  runCmdFrom repoDir exe ["checkout", ref] >>= failHard
+runInternal repoDir (Checkout ref) = do
+  checkoutCmd <- runCmdFrom repoDir exe ["checkout", ref]
+  _ <- failHard checkoutCmd
+  submoduleCmd <- runCmdFrom repoDir exe ["submodule", "update", "--init", "--recursive"]
+  failHard submoduleCmd
