@@ -5,8 +5,11 @@
 Major changes:
 
 - Use full stackage snapshot instead of relying on the build plan #83
-- Get rid of hnix and rely on Derivation type
+- Get rid of hnix and rely on Derivation type from cabal2nix
 - Use nix to provision executables if missing #83
+- Use GHC version that belongs to the LTS #84
+- ghc-options in stack.yaml are now passed to generated Nix exprs #96
+- Support --bench #97
 
 Other enhancements:
 
@@ -16,6 +19,9 @@ Other enhancements:
 - Be able to pin down hackage snapshot #75
 - Optimize cabal2nix calls by reusing HackageDB #75
 - Rewrite tests in hspec to reduce dependencies #83
+- Make stack.yaml filename configurable #90
+- Add option to disable indentation #89
+- When cloning git, also checkout submodules #108
 
 Bug fixes:
 
@@ -25,6 +31,7 @@ Bug fixes:
 - Add --test #35
 - Support Stack subdirs #10
 - Correct version parsing #67
+- Silence git stdout output not to leak into Nix #91
 
 ## v0.1.3.0 (2017-07-27)
 
