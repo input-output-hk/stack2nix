@@ -6,6 +6,8 @@ with pkgs.haskell.lib;
   overrides = self: super: {
     # TODO: separate out output
     stack2nix = justStaticExecutables super.stack2nix;
+    # https://github.com/commercialhaskell/lts-haskell/issues/149
+    stack = doJailbreak super.stack;
 
     # https://github.com/NixOS/cabal2nix/issues/146
     hinotify = if pkgs.stdenv.isDarwin then self.hfsevents else super.hinotify;
