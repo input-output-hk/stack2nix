@@ -30,9 +30,7 @@ import           Stack.Runners                                  (loadCompilerVer
                                                                  withBuildConfig)
 import           Stack.Types.BuildPlan                          (PackageLocation (..),
                                                                  Repo (..))
-import           Stack.Types.Compiler                           (CVType (..),
-                                                                 CompilerVersion,
-                                                                 getGhcVersion)
+import           Stack.Types.Compiler                           (getGhcVersion)
 import           Stack.Types.Config
 import           Stack.Types.Config.Build                       (BuildCommand (..))
 import           Stack.Types.Nix
@@ -46,6 +44,7 @@ import           Stack.Types.PackageIdentifier                  (PackageIdentifi
                                                                  packageIdentifierString)
 import           Stack.Types.PackageName                        (PackageName)
 import           Stack.Types.Runner
+import           Stack.Types.Version                            (Version)
 import           Stack2nix.External.Cabal2nix                   (cabal2nix)
 import           Stack2nix.Hackage                              (loadHackageDB)
 import           Stack2nix.Render                               (render)
@@ -66,20 +65,20 @@ data PackageRef
   | NonHackagePackage PackageIdentifier (PackageLocation FilePath)
   deriving (Eq, Show)
 
-genNixFile :: Args -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
-genNixFile args baseDir uri argRev hackageDB pkgRef = do
+genNixFile :: Args -> Version -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
+genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
     NonHackagePackage _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
     HackagePackage (PackageIdentifierRevision pkg _) ->
-      cabal2nix args ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
+      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
     NonHackagePackage _ident (PLRepo repo) ->
-      cabal2nix args (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
+      cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
     NonHackagePackage _ident (PLFilePath path) -> do
       relPath <- makeRelativeToCurrentDirectory path
       projRoot <- canonicalizePath $ cwd </> baseDir
       let defDir = baseDir </> makeRelative projRoot path
-      cabal2nix args (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
+      cabal2nix args ghcVersion (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
 
 -- TODO: remove once we use flags, options
 sourceMapToPackages :: Map PackageName PackageSource -> [PackageRef]
@@ -99,9 +98,9 @@ planAndGenerate
   -> FilePath
   -> Maybe String
   -> Args
-  -> String
+  -> Version
   -> RIO env ()
-planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcnixversion = do
+planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcVersion = do
   (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
     NeedTargets
     boptsCli
@@ -114,11 +113,11 @@ planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcnixversion = do
     argThreads
     (\p ->
       fmap (addGhcOptions buildConf p)
-        <$> genNixFile args baseDir remoteUri argRev hackageDB p
+        <$> genNixFile args ghcVersion baseDir remoteUri argRev hackageDB p
     )
     pkgs
   let locals = map (\l -> show (packageName (lpPackage l))) _locals
-  liftIO $ render drvs args locals ghcnixversion
+  liftIO . render drvs args locals $ nixVersion ghcVersion
 
 -- | Add ghc-options declared in stack.yaml to the nix derivation for a package
 --   by adding to the configureFlags attribute of the derivation
@@ -150,18 +149,22 @@ runPlan baseDir remoteUri args@Args{..} = do
   let stackFile = baseDir </> argStackYaml
 
   ghcVersion <- getGhcVersionIO globals stackFile
-  let ghcnixversion = filter (/= '.') $ show (getGhcVersion ghcVersion)
-  ensureExecutable ("haskell.compiler.ghc" ++ ghcnixversion)
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcnixversion
+  -- let ghcnixversion = filter (/= '.') $ show (getGhcVersion ghcVersion)
+  ensureExecutable ("haskell.compiler.ghc" ++ nixVersion ghcVersion)
+  withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcVersion
 
-getGhcVersionIO :: GlobalOpts -> FilePath -> IO (CompilerVersion 'CVWanted)
+nixVersion :: Version -> String
+nixVersion =
+  filter (/= '.') . show
+
+getGhcVersionIO :: GlobalOpts -> FilePath -> IO Version
 getGhcVersionIO go stackFile = do
   cp <- canonicalizePath stackFile
   fp <- parseAbsFile cp
   lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->
     -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
     runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
-  loadCompilerVersion go lc
+  getGhcVersion <$> loadCompilerVersion go lc
 
 globalOpts :: FilePath -> FilePath -> Args -> GlobalOpts
 globalOpts currentDir stackRoot Args{..} =
