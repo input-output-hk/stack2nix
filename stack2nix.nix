@@ -32191,7 +32191,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
          }:
          mkDerivation {
            pname = "stack2nix";
-           version = "0.1.3.1";
+           version = "0.2";
            src = ./.;
            configureFlags = [ "--ghc-option=-Werror" ];
            isLibrary = true;
