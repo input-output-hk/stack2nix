@@ -9,6 +9,9 @@ with pkgs.haskell.lib;
     # https://github.com/commercialhaskell/lts-haskell/issues/149
     stack = doJailbreak super.stack;
 
+    # needed until we upgrade to 18.09
+    yaml = disableCabalFlag super.yaml "system-libyaml";
+
     # https://github.com/NixOS/cabal2nix/issues/146
     hinotify = if pkgs.stdenv.isDarwin then self.hfsevents else super.hinotify;
     # Darwin fixes upstreamed in nixpkgs commit 71bebd52547f4486816fd320bb3dc6314f139e67
