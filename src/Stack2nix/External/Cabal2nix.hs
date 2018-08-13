@@ -14,12 +14,13 @@ import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
 import           Distribution.System         (Platform(..), Arch(..), OS(..))
 import           Language.Nix
 import           System.IO                   (hPutStrLn, stderr)
+import           Stack.Types.Version         (Version)
 import           Stack2nix.Types             (Args (..))
 
 import           Text.PrettyPrint.HughesPJClass (Doc)
 
-cabal2nix :: Args -> FilePath -> Maybe Text -> Maybe FilePath -> DB.HackageDB -> IO (Either Doc Derivation)
-cabal2nix Args{..} uri commit subpath hackageDB = do
+cabal2nix :: Args -> Version -> FilePath -> Maybe Text -> Maybe FilePath -> DB.HackageDB -> IO (Either Doc Derivation)
+cabal2nix Args{..} ghcVersion uri commit subpath hackageDB = do
   let runCmdArgs = args $ fromMaybe "." subpath
   hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
   options <- parseArgs runCmdArgs
@@ -31,6 +32,7 @@ cabal2nix Args{..} uri commit subpath hackageDB = do
       [ maybe [] (\c -> ["--revision", unpack c]) commit
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
+      , ["--compiler", "ghc-" ++ show ghcVersion]
       , [uri]
       ]
 
