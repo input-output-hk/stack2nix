@@ -149,7 +149,6 @@ runPlan baseDir remoteUri args@Args{..} = do
   let stackFile = baseDir </> argStackYaml
 
   ghcVersion <- getGhcVersionIO globals stackFile
-  -- let ghcnixversion = filter (/= '.') $ show (getGhcVersion ghcVersion)
   ensureExecutable ("haskell.compiler.ghc" ++ nixVersion ghcVersion)
   withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcVersion
 
