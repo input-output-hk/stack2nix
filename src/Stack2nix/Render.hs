@@ -137,8 +137,6 @@ drvToName drv = unPackageName $ pkgName $ view pkgid drv
 defaultNix :: (Doc -> String) -> String -> [Doc] -> String
 defaultNix pp ghcnixversion drvs = unlines $
  [ "# Generated using stack2nix " <> display version <> "."
- , "#"
- , "# Only works with sufficiently recent nixpkgs, e.g. \"NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/21a8239452adae3a4717772f4e490575586b2755.tar.gz\"."
  , ""
  , "{ pkgs ? (import <nixpkgs> {})"
  , ", compiler ? pkgs.haskell.packages.ghc" ++ ghcnixversion
