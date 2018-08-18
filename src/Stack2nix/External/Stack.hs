@@ -42,7 +42,7 @@ import           Stack.Types.Package                            (PackageSource (
 import           Stack.Types.PackageIdentifier                  (PackageIdentifier (..),
                                                                  PackageIdentifierRevision (..),
                                                                  packageIdentifierString)
-import           Stack.Types.PackageName                        (PackageName)
+import           Stack.Types.PackageName                        (PackageName, parsePackageName)
 import           Stack.Types.Runner
 import           Stack.Types.Version                            (Version)
 import           Stack2nix.External.Cabal2nix                   (cabal2nix)
@@ -104,7 +104,10 @@ planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcVersion = do
   (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
     NeedTargets
     boptsCli
-  let pkgs = sourceMapToPackages sourceMap
+
+  -- Stackage lists bin-package-db but it's in GHC 7.10's boot libraries
+  binPackageDb <- parsePackageName "bin-package-db"
+  let pkgs = sourceMapToPackages (M.delete binPackageDb sourceMap)
   liftIO $ logDebug args $ "plan:\n" ++ show pkgs
 
   hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
