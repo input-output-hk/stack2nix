@@ -39,9 +39,16 @@ args = Args
     -- | Copied from cabal2nix/src/Cabal2nix.hs
     platformReader :: P.ReadP r Platform
     platformReader = do
-      arch <- P.choice [P.string "i686" >> return I386, P.string "x86_64" >> return X86_64]
+      arch <- P.choice
+          [ P.string "i686" >> return I386
+          , P.string "x86_64" >> return X86_64
+          ]
       _ <- P.char '-'
-      os <- P.choice [P.string "linux" >> return Linux, P.string "darwin" >> return OSX]
+      os <- P.choice
+          [ P.string "linux" >> return Linux
+          , P.string "osx" >> return OSX
+          , P.string "darwin" >> return OSX
+          ]
       return (Platform arch os)
 
     readP :: P.ReadP a a -> ReadM a
