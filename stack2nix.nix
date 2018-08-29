@@ -600,7 +600,7 @@ let
            homepage = "http://github.com/ryantm/hdbc-mysql";
            description = "MySQL driver for HDBC";
            license = "LGPL";
-         }) {inherit (pkgs) mysqlclient; inherit (pkgs) openssl; 
+         }) {inherit (pkgs) mysqlclient; inherit (pkgs) openssl;
 inherit (pkgs) zlib;};
       "HDBC-session" = callPackage
         ({ mkDerivation, base, HDBC, stdenv }:
@@ -1653,7 +1653,7 @@ inherit (pkgs) zlib;};
            homepage = "https://github.com/xmonad/X11";
            description = "A binding to the X11 graphics library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs.xorg) libXScrnSaver; inherit (pkgs.xorg) libXext; 
+         }) {inherit (pkgs.xorg) libXScrnSaver; inherit (pkgs.xorg) libXext;
 inherit (pkgs.xorg) libXinerama; inherit (pkgs.xorg) libXrender;};
       "X11-xft" = callPackage
         ({ mkDerivation, base, libXft, stdenv, utf8-string, X11 }:
@@ -4922,7 +4922,7 @@ inherit (pkgs.xorg) libXinerama; inherit (pkgs.xorg) libXrender;};
            doCheck = false;
            description = "Low-level bindings to GLFW OpenGL library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) libGL; inherit (pkgs.xorg) libXext; 
+         }) {inherit (pkgs) libGL; inherit (pkgs.xorg) libXext;
 inherit (pkgs.xorg) libXfixes;};
       "bindings-libzip" = callPackage
         ({ mkDerivation, base, bindings-DSL, libzip, stdenv }:
@@ -6054,36 +6054,41 @@ inherit (pkgs.xorg) libXfixes;};
            description = "RPM packaging tool for Haskell Cabal-based packages";
            license = stdenv.lib.licenses.gpl3;
          }) {};
-      "cabal2nix" = callPackage
-        ({ mkDerivation, aeson, ansi-wl-pprint, base, bytestring, Cabal
-         , containers, deepseq, directory, distribution-nixpkgs, filepath
-         , hackage-db, hopenssl, hpack, language-nix, lens, monad-par
-         , monad-par-extras, mtl, optparse-applicative, pretty, process
-         , split, stdenv, text, time, transformers, yaml
-         }:
-         mkDerivation {
-           pname = "cabal2nix";
-           version = "2.10.0";
-           sha256 = "c1dacf89de801b55822fdac835e15d1a04ab2c823b91e815094d9e1ed0fcc2e7";
-           isLibrary = true;
-           isExecutable = true;
-           libraryHaskellDepends = [
-             aeson ansi-wl-pprint base bytestring Cabal containers deepseq
-             directory distribution-nixpkgs filepath hackage-db hopenssl hpack
-             language-nix lens optparse-applicative pretty process split text
-             time transformers yaml
-           ];
-           executableHaskellDepends = [
-             aeson base bytestring Cabal containers directory
-             distribution-nixpkgs filepath hopenssl language-nix lens monad-par
-             monad-par-extras mtl optparse-applicative pretty
-           ];
-           doHaddock = false;
-           doCheck = false;
-           homepage = "https://github.com/nixos/cabal2nix#readme";
-           description = "Convert Cabal files into Nix build instructions";
-           license = stdenv.lib.licenses.bsd3;
-         }) {};
+        "cabal2nix" = callPackage
+    ({ mkDerivation, aeson, ansi-wl-pprint, base, bytestring, Cabal
+     , containers, deepseq, directory, distribution-nixpkgs, filepath
+     , hackage-db, hopenssl, hpack, language-nix, lens, monad-par
+     , monad-par-extras, mtl, optparse-applicative, pretty, process
+     , split, stdenv, tasty, tasty-golden, text, time, transformers
+     , yaml
+     }:
+     mkDerivation {
+       pname = "cabal2nix";
+       version = "2.11";
+       sha256 = "81580c11178d948012d8adddfd4aaed6a060b1acf2d7bc179069846074cc5df3";
+       isLibrary = true;
+       isExecutable = true;
+       libraryHaskellDepends = [
+         aeson ansi-wl-pprint base bytestring Cabal containers deepseq
+         directory distribution-nixpkgs filepath hackage-db hopenssl hpack
+         language-nix lens optparse-applicative pretty process split text
+         time transformers yaml
+       ];
+       executableHaskellDepends = [
+         aeson base bytestring Cabal containers directory
+         distribution-nixpkgs filepath hopenssl language-nix lens monad-par
+         monad-par-extras mtl optparse-applicative pretty
+       ];
+       testHaskellDepends = [
+         base Cabal containers directory filepath language-nix lens pretty
+         process tasty tasty-golden
+       ];
+       homepage = "https://github.com/nixos/cabal2nix#readme";
+       description = "Convert Cabal files into Nix build instructions";
+       license = stdenv.lib.licenses.bsd3;
+       doCheck = false;
+     }) {};
+
       "cabal2spec" = callPackage
         ({ mkDerivation, base, Cabal, filepath, optparse-applicative
          , stdenv, time
@@ -13100,7 +13105,7 @@ inherit (pkgs.xorg) libXfixes;};
            homepage = "https://github.com/chrisdone/freenect";
            description = "Interface to the Kinect device";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) freenect; inherit (pkgs) freenect_sync; 
+         }) {inherit (pkgs) freenect; inherit (pkgs) freenect_sync;
 inherit (pkgs) libfreenect;};
       "freer-simple" = callPackage
         ({ mkDerivation, base, natural-transformation, stdenv
@@ -13388,8 +13393,8 @@ inherit (pkgs) libfreenect;};
            doCheck = false;
            description = "A Haskell binding to a subset of the GD graphics library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) expat; inherit (pkgs) fontconfig; 
-inherit (pkgs) freetype; inherit (pkgs) gd; 
+         }) {inherit (pkgs) expat; inherit (pkgs) fontconfig;
+inherit (pkgs) freetype; inherit (pkgs) gd;
 inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
       "gdax" = callPackage
         ({ mkDerivation, aeson, aeson-casing, aeson-pretty, base
@@ -17069,36 +17074,61 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            description = "generate pretty graphs from heap profiles";
            license = stdenv.lib.licenses.bsd3;
          }) {};
-      "hpack" = callPackage
-        ({ mkDerivation, aeson, base, bifunctors, bytestring, Cabal
-         , containers, cryptonite, deepseq, directory, filepath, Glob
-         , http-client, http-client-tls, http-types, pretty, scientific
-         , stdenv, text, transformers, unordered-containers, vector, yaml
-         }:
-         mkDerivation {
-           pname = "hpack";
-           version = "0.28.2";
-           sha256 = "b9601332bbac2f042947be1f7478ed0c72367e4caa211b779a75dc26cd8180a3";
-           isLibrary = true;
-           isExecutable = true;
-           libraryHaskellDepends = [
-             aeson base bifunctors bytestring Cabal containers cryptonite
-             deepseq directory filepath Glob http-client http-client-tls
-             http-types pretty scientific text transformers unordered-containers
-             vector yaml
-           ];
-           executableHaskellDepends = [
-             aeson base bifunctors bytestring Cabal containers cryptonite
-             deepseq directory filepath Glob http-client http-client-tls
-             http-types pretty scientific text transformers unordered-containers
-             vector yaml
-           ];
-           doHaddock = false;
-           doCheck = false;
-           homepage = "https://github.com/sol/hpack#readme";
-           description = "An alternative format for Haskell packages";
-           license = stdenv.lib.licenses.mit;
-         }) {};
+  "infer-license" = callPackage
+  ({ mkDerivation, base, directory, filepath, hspec, stdenv, text
+   , text-metrics
+   }:
+   mkDerivation {
+     pname = "infer-license";
+     version = "0.2.0";
+     sha256 = "12e6fe616575159c03cf6fd4a4f30021ecf264a529ab4e4edd6e96e296a98e72";
+     libraryHaskellDepends = [
+       base directory filepath text text-metrics
+     ];
+     testHaskellDepends = [
+       base directory filepath hspec text text-metrics
+     ];
+     description = "Infer software license from a given license file";
+     license = stdenv.lib.licenses.mit;
+   }) {};
+
+  "hpack" = callPackage
+    ({ mkDerivation, aeson, base, bifunctors, bytestring, Cabal
+     , containers, cryptonite, deepseq, directory, filepath, Glob, hspec
+     , http-client, http-client-tls, http-types, HUnit, infer-license
+     , interpolate, mockery, pretty, QuickCheck, scientific, stdenv
+     , template-haskell, temporary, text, transformers
+     , unordered-containers, vector, yaml
+     }:
+     mkDerivation {
+       pname = "hpack";
+       version = "0.29.7";
+       sha256 = "c98b9a1fa59d3c2158e6a0b4e705112e113a2fa779a0e3a6ebaf6291b26a491d";
+       isLibrary = true;
+       isExecutable = true;
+       libraryHaskellDepends = [
+         aeson base bifunctors bytestring Cabal containers cryptonite
+         deepseq directory filepath Glob http-client http-client-tls
+         http-types infer-license pretty scientific text transformers
+         unordered-containers vector yaml
+       ];
+       executableHaskellDepends = [
+         aeson base bifunctors bytestring Cabal containers cryptonite
+         deepseq directory filepath Glob http-client http-client-tls
+         http-types infer-license pretty scientific text transformers
+         unordered-containers vector yaml
+       ];
+       testHaskellDepends = [
+         aeson base bifunctors bytestring Cabal containers cryptonite
+         deepseq directory filepath Glob hspec http-client http-client-tls
+         http-types HUnit infer-license interpolate mockery pretty
+         QuickCheck scientific template-haskell temporary text transformers
+         unordered-containers vector yaml
+       ];
+       homepage = "https://github.com/sol/hpack#readme";
+       description = "A modern format for Haskell packages";
+       license = stdenv.lib.licenses.mit;
+     }) {};
       "hpqtypes" = callPackage
         ({ mkDerivation, aeson, async, base, bytestring, Cabal, containers
          , data-default-class, directory, exceptions, filepath, lifted-base
@@ -39623,4 +39653,3 @@ in compiler.override {
   configurationCommon = { ... }: self: super: {};
   compilerConfig = self: super: {};
 }
-
