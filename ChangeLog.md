@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.1 (2018-09-04)
+
+Bug fixes:
+
+- null bin-package-db for GHC 7.10 #118
+- Bump cabal2nix and remove upper bound #120
+- Parse mac operating system as osx or darwin #123
+- Don't use `src = ./.` #121
+- Pass --compiler to calls to cabal2nix #115
+
 ## v0.2 (2018-07-24)
 
 Major changes:
