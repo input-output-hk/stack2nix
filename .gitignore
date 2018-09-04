@@ -1,6 +1,7 @@
 dist/
 .stack-work/
 .cabal-sandbox/
+.s2n/
 cabal.sandbox.config
 
 *~
