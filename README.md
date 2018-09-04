@@ -15,7 +15,7 @@
 
 ## Installation
 
-There are three options. The first - using Nix is recommended. If there are difficulties please file an issue.
+There are ttwo options. The first - using Nix is recommended. If there are difficulties please file an issue.
 
 ## Nix (recommended)
 
@@ -23,18 +23,11 @@ There are three options. The first - using Nix is recommended. If there are diff
 2. Clone this repo.
 3. Run `nix-build` to build.
 
-### Stack
+### Stack + Nix
 
 1. Install [Nix](https://nixos.org/nix/).
 2. Clone this repo.
 3. Run `stack install --nix` to install.
-
-### Virtual Machine
-
-1. Install [VirtualBox](https://www.virtualbox.org/wiki/VirtualBox) and [Vagrant](https://www.vagrantup.com/).
-2. Clone this repo.
-3. Run `./scripts/vagrant.sh` and take a coffee break.
-4. If there are no errors, log into the VM: `vagrant ssh`.
 
 ## Usage
 
