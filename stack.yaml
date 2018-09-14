@@ -8,6 +8,10 @@ extra-deps:
 - hpack-0.29.6 # dependency of cabal2nix-2.10.0
 - infer-license-0.2.0 # dependency of hpack-0.29.6
 
+- git: git@github.com:commercialhaskell/stack.git
+  commit: 8d1bb774ad2626b62a6f347d10fa1d8e1f00b2e5
+- githash-0.1.0.1@rev:0
+
 nix:
   packages: [zlib,gmp,git,pcre,openssl]
 
