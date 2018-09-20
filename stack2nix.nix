@@ -1,4 +1,4 @@
-# Generated using stack2nix 0.2.
+# Generated using stack2nix 0.2.1.
 
 { pkgs ? (import <nixpkgs> {})
 , compiler ? pkgs.haskell.packages.ghc843
@@ -11,6 +11,7 @@ let
     self: {
       array = null;
       base = null;
+      bin-package-db = null;
       binary = null;
       bytestring = null;
       containers = null;
@@ -14581,6 +14582,23 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            doCheck = false;
            homepage = "https://github.com/christian-marie/git-vogue";
            description = "A framework for pre-commit checks";
+           license = stdenv.lib.licenses.bsd3;
+         }) {};
+      "githash" = callPackage
+        ({ mkDerivation, base, bytestring, directory, filepath, process
+         , stdenv, template-haskell
+         }:
+         mkDerivation {
+           pname = "githash";
+           version = "0.1.0.1";
+           sha256 = "feb1b6e29295adae168aac01a3eb0151db0f3438f15dcb4e8f27674be53eec0f";
+           libraryHaskellDepends = [
+             base bytestring directory filepath process template-haskell
+           ];
+           doHaddock = false;
+           doCheck = false;
+           homepage = "https://github.com/snoyberg/githash#readme";
+           description = "Compile git revision info into Haskell projects";
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "github" = callPackage
@@ -32509,10 +32527,10 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
          , attoparsec, base, base64-bytestring, bindings-uname, bytestring
          , Cabal, conduit, conduit-extra, containers, cryptonite
          , cryptonite-conduit, deepseq, directory, echo, exceptions, extra
-         , file-embed, filelock, filepath, fsnotify, generic-deriving
-         , gitrev, hackage-security, hashable, hpack, hpc, http-client
-         , http-client-tls, http-conduit, http-types, memory, microlens
-         , mintty, monad-logger, mono-traversable, mtl, mustache
+         , fetchgit, file-embed, filelock, filepath, fsnotify
+         , generic-deriving, githash, hackage-security, hashable, hpack, hpc
+         , http-client, http-client-tls, http-conduit, http-types, memory
+         , microlens, mintty, monad-logger, mono-traversable, mtl, mustache
          , neat-interpolation, network-uri, open-browser
          , optparse-applicative, optparse-simple, path, path-io, persistent
          , persistent-sqlite, persistent-template, pretty, primitive
@@ -32525,10 +32543,13 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
          }:
          mkDerivation {
            pname = "stack";
-           version = "1.7.1";
-           sha256 = "19c4f2e02975bb797a339cfe2893c9e1f40241a910da45be34c5c2f05d62329f";
-           revision = "9";
-           editedCabalFile = "12gbrnhmci2kpz42x7nwfzcq3syp0z2l14fjcakw8bhjmgd9wp34";
+           version = "1.9.0.1";
+           src = fetchgit {
+             url = "https://github.com/commercialhaskell/stack.git";
+             sha256 = "1bhx4cz80sf57sh167cjpm7nnibp9h96xil1d15zd0307xpvnyxg";
+             rev = "8d1bb774ad2626b62a6f347d10fa1d8e1f00b2e5";
+             fetchSubmodules = true;
+           };
            isLibrary = true;
            isExecutable = true;
            setupHaskellDepends = [ base Cabal filepath ];
@@ -32549,12 +32570,13 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
              unicode-transforms unix unix-compat unliftio unordered-containers
              vector yaml zip-archive zlib
            ];
+           libraryToolDepends = [ hpack ];
            executableHaskellDepends = [
              aeson annotated-wl-pprint ansi-terminal async attoparsec base
              base64-bytestring bindings-uname bytestring Cabal conduit
              conduit-extra containers cryptonite cryptonite-conduit deepseq
              directory echo exceptions extra file-embed filelock filepath
-             fsnotify generic-deriving gitrev hackage-security hashable hpack
+             fsnotify generic-deriving githash hackage-security hashable hpack
              hpc http-client http-client-tls http-conduit http-types memory
              microlens mintty monad-logger mono-traversable mtl mustache
              neat-interpolation network-uri open-browser optparse-applicative
@@ -32574,6 +32596,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
              mkdir -p $out/share/bash-completion/completions
              $exe --bash-completion-script $exe >$out/share/bash-completion/completions/stack
            '';
+           preConfigure = "hpack";
            homepage = "http://haskellstack.org";
            description = "The Haskell Tool Stack";
            license = stdenv.lib.licenses.bsd3;
@@ -32586,7 +32609,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
          }:
          mkDerivation {
            pname = "stack2nix";
-           version = "0.2";
+           version = "0.2.1";
            src = ./.;
            configureFlags = [ "--ghc-option=-Werror" ];
            isLibrary = true;
