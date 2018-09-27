@@ -1,4 +1,7 @@
 language: nix
+os:
+- linux
+- osx
 sudo: required
 before_script:
 - sudo mount -o remount,exec,size=4G,mode=755 /run/user || true
