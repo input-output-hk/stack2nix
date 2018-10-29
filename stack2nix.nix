@@ -1,4 +1,4 @@
-# Generated using stack2nix 0.2.
+# Generated using stack2nix 0.2.1.
 
 { pkgs ? (import <nixpkgs> {})
 , compiler ? pkgs.haskell.packages.ghc843
@@ -11,6 +11,7 @@ let
     self: {
       array = null;
       base = null;
+      bin-package-db = null;
       binary = null;
       bytestring = null;
       containers = null;
@@ -6115,6 +6116,10 @@ inherit (pkgs.xorg) libXfixes;};
            ];
            doHaddock = false;
            doCheck = false;
+           preCheck = ''
+             export PATH="$PWD/dist/build/cabal2nix:$PATH"
+             export HOME="$TMPDIR/home"
+           '';
            homepage = "https://github.com/nixos/cabal2nix#readme";
            description = "Convert Cabal files into Nix build instructions";
            license = stdenv.lib.licenses.bsd3;
@@ -32586,7 +32591,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
          }:
          mkDerivation {
            pname = "stack2nix";
-           version = "0.2";
+           version = "0.2.1";
            src = ./.;
            configureFlags = [ "--ghc-option=-Werror" ];
            isLibrary = true;
@@ -39136,7 +39141,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            pname = "yaml";
            version = "0.8.32";
            sha256 = "dc20f863deb4ee75395bf1f78268781db76be6209af67b70c05f6e1a09f47a31";
-           configureFlags = [ "-fsystem-libyaml" ];
+           configureFlags = [ "-f-system-libyaml" ];
            isLibrary = true;
            isExecutable = true;
            libraryHaskellDepends = [
