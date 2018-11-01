@@ -59,11 +59,18 @@ import           System.Directory                               (canonicalizePat
 import           System.FilePath                                (makeRelative,
                                                                  (</>))
 import           Text.PrettyPrint.HughesPJClass                 (Doc)
+import           System.Environment                      (lookupEnv)
 
 data PackageRef
   = HackagePackage PackageIdentifierRevision
   | NonHackagePackage PackageIdentifier (PackageLocation FilePath)
   deriving (Eq, Show)
+
+getStackRoot :: IO String
+getStackRoot = fromMaybe defaultStackRoot <$> lookupEnv stackRootEnv
+  where
+    stackRootEnv = "S2N_STACK_ROOT"
+    defaultStackRoot = "/tmp/s2n"
 
 genNixFile :: Args -> Version -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
 genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
@@ -143,7 +150,7 @@ runPlan :: FilePath
         -> Args
         -> IO ()
 runPlan baseDir remoteUri args@Args{..} = do
-  let stackRoot = "/tmp/s2n"
+  stackRoot <- getStackRoot
   createDirectoryIfMissing True stackRoot
   let globals = globalOpts baseDir stackRoot args
   let stackFile = baseDir </> argStackYaml
