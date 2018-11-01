@@ -15,7 +15,7 @@
 
 ## Installation
 
-There are ttwo options. The first - using Nix is recommended. If there are difficulties please file an issue.
+There are two options. The first - using Nix is recommended. If there are difficulties please file an issue.
 
 ## Nix (recommended)
 
