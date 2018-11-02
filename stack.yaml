@@ -4,13 +4,19 @@ packages:
 - '.'
 
 extra-deps:
-- cabal2nix-2.11
-- hpack-0.29.6 # dependency of cabal2nix-2.10.0
-- infer-license-0.2.0 # dependency of hpack-0.29.6
+- cabal2nix-2.11.1
+- hpack-0.31.0@rev:0
+- infer-license-0.2.0@rev:0 #for hpack-0.31
+- yaml-0.10.4.0@rev:0 #for hpack-0.31
+- stack-1.9.1
+- lens-4.17
+- cabal-doctest-1.0.6@rev:2
+- http-api-data-0.3.10
+- Cabal-2.4.0.1@rev:0
 
-- git: https://github.com/commercialhaskell/stack.git
-  commit: 8d1bb774ad2626b62a6f347d10fa1d8e1f00b2e5
-- githash-0.1.0.1@rev:0
+flags:
+  stack:
+    disable-git-info: true
 
 nix:
   packages: [zlib,gmp,git,pcre,openssl]
