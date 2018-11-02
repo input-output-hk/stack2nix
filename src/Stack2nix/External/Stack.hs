@@ -186,7 +186,8 @@ globalOpts currentDir stackRoot Args{..} =
                   , ["--haddock" | argHaddock]
                   , ["--no-install-ghc"]
                   ]
-    go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
+    go = globalOptsFromMonoid False ColorNever . fromJust . getParseResult $
+      execParserPure defaultPrefs pinfo args
 
 buildOpts :: BuildOptsCLI
 buildOpts = fromJust . getParseResult $ execParserPure defaultPrefs (info (buildOptsParser Build) briefDesc) ["--dry-run"]

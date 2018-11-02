@@ -4,9 +4,20 @@ packages:
 - '.'
 
 extra-deps:
-- cabal2nix-2.11
-- hpack-0.29.6 # dependency of cabal2nix-2.10.0
-- infer-license-0.2.0 # dependency of hpack-0.29.6
+- cabal2nix-2.11.1
+- hpack-0.31.0@rev:0
+- infer-license-0.2.0@rev:0 #for hpack-0.31
+- yaml-0.10.4.0@rev:0 #for hpack-0.31
+- stack-1.9.1
+- lens-4.17
+- cabal-doctest-1.0.6@rev:2
+- http-api-data-0.3.10
+- Cabal-2.4.0.1@rev:0
+- happy-1.19.9@rev:3 #for haskell-src-exts
+
+flags:
+  stack:
+    disable-git-info: true
 
 nix:
   packages: [zlib,gmp,git,pcre,openssl]
