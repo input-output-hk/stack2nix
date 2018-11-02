@@ -13,6 +13,7 @@ extra-deps:
 - cabal-doctest-1.0.6@rev:2
 - http-api-data-0.3.10
 - Cabal-2.4.0.1@rev:0
+- happy-1.19.9@rev:3 #for haskell-src-exts
 
 flags:
   stack:
