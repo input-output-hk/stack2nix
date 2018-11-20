@@ -1,7 +1,8 @@
 module Stack2nix.Types where
 
-import           Data.Time           (UTCTime)
-import           Distribution.System (Platform)
+import           Data.Time                       (UTCTime)
+import           Distribution.PackageDescription (FlagName)
+import           Distribution.System             (Platform)
 
 data Args = Args
   { argRev             :: Maybe String
@@ -18,3 +19,5 @@ data Args = Args
   , argVerbose         :: Bool
   }
   deriving (Show)
+
+type Flags = [(FlagName, Bool)]
