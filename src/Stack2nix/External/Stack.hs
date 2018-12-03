@@ -33,10 +33,12 @@ import           Stack.Types.BuildPlan                          (PackageLocation
 import           Stack.Types.Compiler                           (getGhcVersion)
 import           Stack.Types.Config
 import           Stack.Types.Config.Build                       (BuildCommand (..))
+import           Stack.Types.FlagName                           (toCabalFlagName)
 import           Stack.Types.Nix
 import           Stack.Types.Package                            (PackageSource (..),
                                                                  lpLocation,
                                                                  lpPackage,
+                                                                 packageFlags,
                                                                  packageName,
                                                                  packageVersion)
 import           Stack.Types.PackageIdentifier                  (PackageIdentifier (..),
@@ -48,7 +50,7 @@ import           Stack.Types.Version                            (Version)
 import           Stack2nix.External.Cabal2nix                   (cabal2nix)
 import           Stack2nix.Hackage                              (loadHackageDB)
 import           Stack2nix.Render                               (render)
-import           Stack2nix.Types                                (Args (..))
+import           Stack2nix.Types                                (Args (..), Flags)
 import           Stack2nix.Util                                 (ensureExecutable,
                                                                  logDebug,
                                                                  mapPool)
@@ -61,35 +63,37 @@ import           System.FilePath                                (makeRelative,
 import           Text.PrettyPrint.HughesPJClass                 (Doc)
 
 data PackageRef
-  = HackagePackage PackageIdentifierRevision
-  | NonHackagePackage PackageIdentifier (PackageLocation FilePath)
+  = HackagePackage Flags PackageIdentifierRevision
+  | NonHackagePackage Flags PackageIdentifier (PackageLocation FilePath)
   deriving (Eq, Show)
 
 genNixFile :: Args -> Version -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
 genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
-    NonHackagePackage _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage (PackageIdentifierRevision pkg _) ->
-      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing hackageDB
-    NonHackagePackage _ident (PLRepo repo) ->
-      cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) hackageDB
-    NonHackagePackage _ident (PLFilePath path) -> do
+    NonHackagePackage _flags _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
+    HackagePackage flags (PackageIdentifierRevision pkg _) ->
+      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing flags hackageDB
+    NonHackagePackage flags _ident (PLRepo repo) ->
+      cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) flags hackageDB
+    NonHackagePackage flags _ident (PLFilePath path) -> do
       relPath <- makeRelativeToCurrentDirectory path
       projRoot <- canonicalizePath $ cwd </> baseDir
       let defDir = baseDir </> makeRelative projRoot path
-      cabal2nix args ghcVersion (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) hackageDB
+      cabal2nix args ghcVersion (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) flags hackageDB
 
 -- TODO: remove once we use flags, options
 sourceMapToPackages :: Map PackageName PackageSource -> [PackageRef]
 sourceMapToPackages = map sourceToPackage . M.elems
   where
     sourceToPackage :: PackageSource -> PackageRef
-    sourceToPackage (PSIndex _ _flags _options pir) = HackagePackage pir
+    sourceToPackage (PSIndex _ flags _options pir) = HackagePackage (toCabalFlags flags) pir
     sourceToPackage (PSFiles lp _) =
       let pkg = lpPackage lp
           ident = PackageIdentifier (packageName pkg) (packageVersion pkg)
-       in NonHackagePackage ident (lpLocation lp)
+      in NonHackagePackage (toCabalFlags $ packageFlags pkg) ident (lpLocation lp)
+    toCabalFlags fs = [ (toCabalFlagName f0, enabled)
+                      | (f0, enabled) <- M.toList fs ]
 
 
 planAndGenerate
@@ -138,8 +142,8 @@ addGhcOptions buildConf pkgRef drv =
       False
   pkgName :: PackageName
   pkgName = case pkgRef of
-    HackagePackage (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
-    NonHackagePackage (PackageIdentifier n _) _                          -> n
+    HackagePackage _ (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
+    NonHackagePackage _ (PackageIdentifier n _) _                          -> n
 
 runPlan :: FilePath
         -> Maybe String
@@ -189,7 +193,8 @@ globalOpts currentDir stackRoot Args{..} =
                   , ["--haddock" | argHaddock]
                   , ["--no-install-ghc"]
                   ]
-    go = globalOptsFromMonoid False . fromJust . getParseResult $ execParserPure defaultPrefs pinfo args
+    go = globalOptsFromMonoid False ColorNever . fromJust . getParseResult $
+      execParserPure defaultPrefs pinfo args
 
 buildOpts :: BuildOptsCLI
 buildOpts = fromJust . getParseResult $ execParserPure defaultPrefs (info (buildOptsParser Build) briefDesc) ["--dry-run"]

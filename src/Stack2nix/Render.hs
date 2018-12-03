@@ -42,6 +42,8 @@ basePackages :: Set String
 basePackages = Set.fromList
   [ "array"
   , "base"
+  -- bin-package-db is in GHC 7.10's boot libraries
+  , "bin-package-db"
   , "binary"
   , "bytestring"
   , "Cabal"

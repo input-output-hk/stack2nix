@@ -7,20 +7,22 @@ module Stack2nix.External.Cabal2nix (
 
 import           Cabal2nix                   (cabal2nixWithDB, parseArgs, optNixpkgsIdentifier, Options)
 import           Control.Lens
+import           Data.Bool                   (bool)
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (Text, unpack)
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
+import           Distribution.PackageDescription (unFlagName)
 import           Distribution.System         (Platform(..), Arch(..), OS(..))
 import           Language.Nix
 import           System.IO                   (hPutStrLn, stderr)
 import           Stack.Types.Version         (Version)
-import           Stack2nix.Types             (Args (..))
+import           Stack2nix.Types             (Args (..), Flags)
 
 import           Text.PrettyPrint.HughesPJClass (Doc)
 
-cabal2nix :: Args -> Version -> FilePath -> Maybe Text -> Maybe FilePath -> DB.HackageDB -> IO (Either Doc Derivation)
-cabal2nix Args{..} ghcVersion uri commit subpath hackageDB = do
+cabal2nix :: Args -> Version -> FilePath -> Maybe Text -> Maybe FilePath -> Flags -> DB.HackageDB -> IO (Either Doc Derivation)
+cabal2nix Args{..} ghcVersion uri commit subpath flags hackageDB = do
   let runCmdArgs = args $ fromMaybe "." subpath
   hPutStrLn stderr $ unwords ("+ cabal2nix":runCmdArgs)
   options <- parseArgs runCmdArgs
@@ -33,6 +35,7 @@ cabal2nix Args{..} ghcVersion uri commit subpath hackageDB = do
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
       , ["--compiler", "ghc-" ++ show ghcVersion]
+      , ["-f" ++ bool "-" "" enable ++ unFlagName f | (f, enable) <- flags]
       , [uri]
       ]
 
