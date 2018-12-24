@@ -4,8 +4,8 @@ synopsis:            Convert stack.yaml files into Nix build instructions.
 description:         Convert stack.yaml files into Nix build instructions.
 license:             MIT
 license-file:        LICENSE
-author:              Jacob Mitchell
-maintainer:          jacob.mitchell@iohk.io
+author:              IOHK DevOps
+maintainer:          stack2nix@iohk.io
 category:            Distribution, Nix
 build-type:          Simple
 extra-source-files:
