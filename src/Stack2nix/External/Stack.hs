@@ -43,7 +43,7 @@ import           Stack.Types.Package                            (PackageSource (
                                                                  packageVersion)
 import           Stack.Types.PackageIdentifier                  (PackageIdentifier (..),
                                                                  PackageIdentifierRevision (..),
-                                                                 packageIdentifierString)
+                                                                 packageIdentifierRevisionString)
 import           Stack.Types.PackageName                        (PackageName)
 import           Stack.Types.Runner
 import           Stack.Types.Version                            (Version)
@@ -72,8 +72,8 @@ genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
     NonHackagePackage _flags _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage flags (PackageIdentifierRevision pkg _) ->
-      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing flags hackageDB
+    HackagePackage flags pir ->
+      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierRevisionString pir) Nothing Nothing flags hackageDB
     NonHackagePackage flags _ident (PLRepo repo) ->
       cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) flags hackageDB
     NonHackagePackage flags _ident (PLFilePath path) -> do
