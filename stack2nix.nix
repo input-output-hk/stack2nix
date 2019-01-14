@@ -16557,7 +16557,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            description = "File/folder watching for OS X";
            license = stdenv.lib.licenses.bsd3;
            platforms = [ "x86_64-darwin" ];
-         }) {inherit (pkgs.darwin.apple_sdk.frameworks) Cocoa;};
+         }) {inherit (pkgs.darwin.apple_sdk.frameworks) Cocoa CoreServices;};
       "hidapi" = callPackage
         ({ mkDerivation, base, bytestring, deepseq, deepseq-generics
          , stdenv, systemd
