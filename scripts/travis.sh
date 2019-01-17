@@ -9,6 +9,8 @@ source $scriptDir/init-env.sh
 
 # SMOKE TESTS
 
+export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/ef802feaceba073e3e5178af1b5d65f27f5cc93b.tar.gz
+
 # basic remote
 \time stack2nix --verbose -o /tmp/haskell-dummy-project1.nix \
 	  --revision 31aac4dcc7b87d5cb62dafe9b9402346fdf449a6 \

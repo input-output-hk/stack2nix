@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.2 (2019-01-17)
+
+Bug fixes:
+
+- LTS-13 compatibility
+- Proper fix for bin-package-db #118
+- Add package flags #148
+- Upgrade stack to 1.9 #133
+
 ## v0.2.1 (2018-09-04)
 
 Bug fixes:
