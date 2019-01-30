@@ -26,6 +26,7 @@ args = Args
        <*> strArgument (metavar "URI")
        <*> flag True False (long "no-indent" <> help "disable indentation and place one item per line")
        <*> switch (long "verbose" <> help "verbose output")
+       <*> optional (strOption $ long "cabal2nix-args" <> help "extra arguments for cabal2nix")
   where
     -- | A parser for the date. Hackage updates happen maybe once or twice a month.
     -- Example: parseTime defaultTimeLocale "%FT%T%QZ" "2017-11-20T12:18:35Z" :: Maybe UTCTime

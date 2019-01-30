@@ -8,7 +8,7 @@ module Stack2nix.External.Cabal2nix (
 import           Cabal2nix                   (cabal2nixWithDB, parseArgs, optNixpkgsIdentifier, Options)
 import           Control.Lens
 import           Data.Bool                   (bool)
-import           Data.Maybe                  (fromMaybe)
+import           Data.Maybe                  (fromMaybe, maybeToList)
 import           Data.Text                   (Text, unpack)
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
@@ -32,6 +32,7 @@ cabal2nix Args{..} ghcVersion uri commit subpath flags hackageDB = do
     args :: FilePath -> [String]
     args dir = concat
       [ maybe [] (\c -> ["--revision", unpack c]) commit
+      , maybeToList argCabal2nixArgs
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
       , ["--compiler", "ghc-" ++ show ghcVersion]
