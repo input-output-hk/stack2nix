@@ -17,6 +17,7 @@ data Args = Args
   , argUri             :: String
   , argIndent          :: Bool
   , argVerbose         :: Bool
+  , argCabal2nixArgs   :: Maybe String
   }
   deriving (Show)
 
