@@ -7,6 +7,7 @@ module Stack2nix.External.Stack
   ) where
 
 import           Control.Lens                                   ((%~))
+import           Control.Monad                                  (when)
 import           Data.List                                      (concat)
 import qualified Data.Map.Strict                                as M
 import           Data.Maybe                                     (fromJust)
@@ -156,7 +157,8 @@ runPlan baseDir remoteUri args@Args{..} = do
   let stackFile = baseDir </> argStackYaml
 
   ghcVersion <- getGhcVersionIO globals stackFile
-  ensureExecutable ("haskell.compiler.ghc" ++ nixVersion ghcVersion)
+  when argEnsureExecutables $
+    ensureExecutable ("haskell.compiler.ghc" ++ nixVersion ghcVersion)
   withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcVersion
 
 nixVersion :: Version -> String
