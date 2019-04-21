@@ -8,12 +8,15 @@ module Stack2nix.Render
 
 import           Control.Lens
 import           Control.Monad                           (when)
+import qualified Data.ByteString                         as BS
 import           Data.Either                             (lefts, rights)
 import           Data.List                               (filter, isPrefixOf,
                                                           sort)
 import           Data.Monoid                             ((<>))
 import           Data.Set                                (Set)
 import qualified Data.Set                                as Set
+import qualified Data.Text                               as Text
+import           Data.Text.Encoding                      (encodeUtf8)
 import           Distribution.Nixpkgs.Haskell.BuildInfo  (haskell, pkgconfig,
                                                           system, tool)
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation,
@@ -86,7 +89,7 @@ render results args locals ghcnixversion = do
    let out = defaultNix pp ghcnixversion $ renderedMissing ++ map (renderOne args locals) drvs
 
    case argOutFile args of
-     Just fname -> writeFile fname out
+     Just fname -> BS.writeFile fname (encodeUtf8 $ Text.pack out)
      Nothing    -> putStrLn out
 
 renderOne :: Args -> [String] -> Derivation -> Doc
