@@ -31392,8 +31392,8 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            license = stdenv.lib.licenses.bsd3;
          }) {};
       "stack2nix" = callPackage
-        ({ mkDerivation, async, base, Cabal, cabal2nix, containers
-         , directory, distribution-nixpkgs, filepath, hackage-db
+        ({ mkDerivation, async, base, bytestring, Cabal, cabal2nix
+         , containers, directory, distribution-nixpkgs, filepath, hackage-db
          , language-nix, lens, optparse-applicative, path, pretty, process
          , regex-pcre, SafeSemaphore, stack, stdenv, temporary, text, time
          }:
@@ -31405,7 +31405,7 @@ inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
            isLibrary = true;
            isExecutable = true;
            libraryHaskellDepends = [
-             async base Cabal cabal2nix containers directory
+             async base bytestring Cabal cabal2nix containers directory
              distribution-nixpkgs filepath hackage-db language-nix lens
              optparse-applicative path pretty process regex-pcre SafeSemaphore
              stack temporary text time

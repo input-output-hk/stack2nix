@@ -1,5 +1,13 @@
 # Changelog
 
+## (next)
+
+Other enhancements:
+
+- When writing nix expressions to file (`-o` flag), force UTF-8 encoding #164
+- Add flag `--no-ensure-executables` to stop `stack2nix` from ensuring
+  necessary executables exist #164
+
 ## v0.2.2 (2019-01-17)
 
 Bug fixes:

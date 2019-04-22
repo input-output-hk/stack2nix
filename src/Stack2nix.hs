@@ -8,7 +8,7 @@ module Stack2nix
   , version
   ) where
 
-import           Control.Monad              (unless, void)
+import           Control.Monad              (unless, void, when)
 import           Data.Maybe                 (isJust)
 import           Data.Monoid                ((<>))
 import           Paths_stack2nix            (version)
@@ -26,9 +26,10 @@ import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
-  ensureExecutableExists "cabal" "cabal-install"
-  ensureExecutableExists "git" "git"
-  ensureExecutableExists "nix-prefetch-git" "nix-prefetch-scripts"
+  when argEnsureExecutables $ do
+    ensureExecutableExists "cabal" "cabal-install"
+    ensureExecutableExists "git" "git"
+    ensureExecutableExists "nix-prefetch-git" "nix-prefetch-scripts"
   assertMinVer "git" "2"
   assertMinVer "cabal" "2"
   setEnv "GIT_QUIET" "y"
