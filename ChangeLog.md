@@ -1,12 +1,16 @@
 # Changelog
 
-## (next)
+## v0.2.3 (2019-04-29)
 
-Other enhancements:
+Added:
 
-- When writing nix expressions to file (`-o` flag), force UTF-8 encoding #164
 - Add flag `--no-ensure-executables` to stop `stack2nix` from ensuring
   necessary executables exist #164
+- Allow extra cabal2nix flags #156
+
+Bug Fixes:
+
+- When writing nix expressions to file (`-o` flag), force UTF-8 encoding #164
 
 ## v0.2.2 (2019-01-17)
 
