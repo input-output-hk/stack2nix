@@ -76,4 +76,4 @@ ensureExecutable nixAttr = do
       hPutStrLn stderr $ err2
       path <- getEnv "PATH"
       setEnv "PATH" (unpack (strip (pack stdout)) ++ "/bin" ++ ":" ++ path)
-    ExitFailure _ -> error $ nixAttr ++ " failed to build via nix"
+    ExitFailure _ -> error $ nixAttr ++ " failed to build via nix:\n" ++ err2
