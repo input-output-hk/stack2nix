@@ -40,58 +40,8 @@ import           Text.PrettyPrint.HughesPJClass          (Doc, fcat, nest,
                                                           pPrint, punctuate,
                                                           semi, space, text)
 
--- Boot packages (wired-in and non-wired-in).
--- These are set to `null` in the generated nix package set.
--- The wired-in packages follow
---    * https://github.com/commercialhaskell/stack/blob/d8e942ea69eb189f67a045f0c595612034dbb75d/src/Stack/Constants.hs#L102
---    * https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
--- For recent GHC releases:
---    * https://github.com/ghc/ghc/blob/ghc-8.2.2-release/compiler/basicTypes/Module.hs#L1073
---    * https://github.com/ghc/ghc/blob/ghc-8.4.4-release/compiler/basicTypes/Module.hs#L1078
---    * https://github.com/ghc/ghc/blob/ghc-8.6.4-release/compiler/basicTypes/Module.hs#L1066 (got rid of "dph-seq" and "dph-par")
---    * https://github.com/ghc/ghc/blob/334dd6da47326f47b/compiler/basicTypes/Module.hs#L1088 (in-progress 8.8)
--- TODO: This should probably be dependent on the GHC version used.
---       A split into wired-in and not-wired-in packages may also be advisable.
-basePackages :: Set String
-basePackages = Set.fromList
-  [ "array"
-  , "base"
-  -- bin-package-db is in GHC 7.10's boot libraries
-  , "bin-package-db"
-  , "binary"
-  , "bytestring"
-  , "Cabal"
-  , "containers"
-  , "deepseq"
-  , "directory"
-  , "dph-par" -- for GHC < 8.6
-  , "dph-seq" -- for GHC < 8.6
-  , "filepath"
-  , "ghc"
-  , "ghc-boot"
-  , "ghc-boot-th"
-  , "ghc-prim"
-  , "ghci"
-  , "haskeline"
-  , "hoopl"
-  , "hpc"
-  , "integer-gmp" -- for GHC < 8.8
-  , "integer-simple" -- for GHC < 8.8
-  , "integer-wired-in" -- for GHC >= 8.8, see https://gitlab.haskell.org/ghc/ghc/commit/fc2ff6dd7496a33bf68165b28f37f40b7d647418
-  , "interactive"
-  , "pretty"
-  , "process"
-  , "rts"
-  , "template-haskell"
-  , "terminfo"
-  , "time"
-  , "transformers"
-  , "unix"
-  , "xhtml"
-  ]
-
-render :: [Either Doc Derivation] -> Args -> [String] -> String -> IO ()
-render results args locals ghcnixversion = do
+render :: [Either Doc Derivation] -> Args -> [String] -> String -> Set String -> IO ()
+render results args locals ghcnixversion basePackages = do
    let docs = lefts results
    when (length docs > 0) $ do
      hPutStrLn stderr $ show docs

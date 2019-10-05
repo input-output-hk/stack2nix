@@ -54,3 +54,13 @@ Stack2nix can generate a nix expressions for Haskell packages hosted in git repo
 ## Testing
 
 Run `./scripts/travis.sh` to build and test.
+
+## Development
+
+### Updating GHC base packages
+
+```
+curl https://raw.githubusercontent.com/bgamari/ghc-utils/master/library-versions/pkg_versions.txt > pkg_versions.txt
+```
+
+then check it into the repo.
