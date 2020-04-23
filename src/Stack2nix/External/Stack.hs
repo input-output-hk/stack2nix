@@ -14,118 +14,134 @@ import           Data.Maybe                                     (fromJust)
 import qualified Data.Set                                       as Set (fromList,
                                                                         union)
 import           Data.Text                                      (pack, unpack)
+import qualified Data.Text                                      as Text
 import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
                                                                  configureFlags)
 import qualified Distribution.Nixpkgs.Haskell.Hackage           as DB
+import           Distribution.Types.Version                     (nullVersion, versionNumbers)
 import           Options.Applicative
-import           Path                                           (parseAbsFile)
-import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
+import           Path                                           (parseRelFile, parseAbsDir, fromAbsDir)
+import qualified Path                                           ((</>))
 import           Stack.Build.Target                             (NeedTargets (..))
 import           Stack.Config
 import           Stack.Options.BuildParser
 import           Stack.Options.GlobalParser
 import           Stack.Options.Utils                            (GlobalOptsContext (..))
 import           Stack.Prelude                                  hiding
-                                                                 (logDebug)
-import           Stack.Runners                                  (loadCompilerVersion,
-                                                                 withBuildConfig)
-import           Stack.Types.BuildPlan                          (PackageLocation (..),
-                                                                 Repo (..))
-import           Stack.Types.Compiler                           (getGhcVersion)
+                                                                 (local, logDebug)
+import           Stack.Runners                                  (ShouldReexec(..), withConfig, withRunnerGlobal)
+import           Stack.Setup                                    (setupEnv)
+import           Stack.Types.Compiler                           (getGhcVersion, wantedToActual)
 import           Stack.Types.Config
 import           Stack.Types.Config.Build                       (BuildCommand (..))
-import           Stack.Types.FlagName                           (toCabalFlagName)
 import           Stack.Types.Nix
-import           Stack.Types.Package                            (PackageSource (..),
-                                                                 lpLocation,
-                                                                 lpPackage,
-                                                                 packageFlags,
-                                                                 packageName,
-                                                                 packageVersion)
-import           Stack.Types.PackageIdentifier                  (PackageIdentifier (..),
-                                                                 PackageIdentifierRevision (..),
-                                                                 packageIdentifierString)
-import           Stack.Types.PackageName                        (PackageName, parsePackageName)
-import           Stack.Types.Runner
+import           Stack.Types.SourceMap                          (CommonPackage(..), DepPackage(..), SourceMap(..))
 import           Stack.Types.Version                            (Version)
 import           Stack2nix.External.Cabal2nix                   (cabal2nix)
 import           Stack2nix.Hackage                              (loadHackageDB)
 import           Stack2nix.Render                               (render)
 import           Stack2nix.Types                                (Args (..), Flags)
-import           Stack2nix.Util                                 (ensureExecutable,
+import           Stack2nix.Util                                 (ensureExecutable, 
                                                                  logDebug,
                                                                  mapPool)
 import           System.Directory                               (canonicalizePath,
                                                                  createDirectoryIfMissing,
                                                                  getCurrentDirectory,
+                                                                 makeAbsolute,
                                                                  makeRelativeToCurrentDirectory)
 import           System.FilePath                                (makeRelative,
                                                                  (</>))
 import           Text.PrettyPrint.HughesPJClass                 (Doc)
 
 data PackageRef
-  = HackagePackage Flags PackageIdentifierRevision
-  | NonHackagePackage Flags PackageIdentifier (PackageLocation FilePath)
+  = HackagePackage Flags PackageIdentifier
+  | NonHackagePackage Flags PackageLocation PackageIdentifier
   deriving (Eq, Show)
 
 genNixFile :: Args -> Version -> FilePath -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
 genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
   cwd <- getCurrentDirectory
   case pkgRef of
-    NonHackagePackage _flags _ident PLArchive {} -> error "genNixFile: No support for archive package locations"
-    HackagePackage flags (PackageIdentifierRevision pkg _) ->
-      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing flags hackageDB
-    NonHackagePackage flags _ident (PLRepo repo) ->
-      cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (repoSubdirs repo)) flags hackageDB
-    NonHackagePackage flags _ident (PLFilePath path) -> do
-      relPath <- makeRelativeToCurrentDirectory path
+    NonHackagePackage flags (PLImmutable (PLIArchive (Archive (ALUrl url) _ _ _)  _)) _ -> do
+      let parts = Text.splitOn "/" url
+      case parts of
+        ("https:" : "" : "github.com" : owner : repo : "archive" : file) -> do
+          let repoUrl = "https://github.com/" <> owner <> "/" <> repo <> ".git"
+              rev = head . Text.splitOn "." . head $ file
+          cabal2nix args ghcVersion (unpack repoUrl) (Just rev) Nothing flags hackageDB
+        _ -> do
+          error $ "genNixFile: unsupported archive URL: " <> show url 
+    
+    NonHackagePackage _flags (PLImmutable (PLIArchive (Archive (ALFilePath _path) _ _ _)  _)) _ -> do
+      error $ "genNixFile: local archives are not supported"
+    
+    NonHackagePackage flags (PLImmutable (PLIRepo repo _)) _ ->
+      cabal2nix args ghcVersion (unpack $ repoUrl repo) (Just $ repoCommit repo) (Just (unpack . repoSubdir $ repo)) flags hackageDB
+    
+    NonHackagePackage flags (PLMutable (ResolvedPath path _)) _ -> do
+      relPath <- makeRelativeToCurrentDirectory (unpack . textDisplay $ path)
       projRoot <- canonicalizePath $ cwd </> baseDir
-      let defDir = baseDir </> makeRelative projRoot path
+      let defDir = baseDir </> makeRelative projRoot (unpack . textDisplay $ path)
       cabal2nix args ghcVersion (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) flags hackageDB
+    
+    NonHackagePackage _ (PLImmutable (PLIHackage _ _ _)) _ -> do
+      error $ "genNixFile: impossible happened! got NonHackage Hackage package!"
+    
+    HackagePackage flags pkg@(PackageIdentifier _ _) ->
+      cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkg) Nothing Nothing flags hackageDB
 
 -- TODO: remove once we use flags, options
-sourceMapToPackages :: Map PackageName PackageSource -> [PackageRef]
+sourceMapToPackages :: Map PackageName DepPackage -> [PackageRef]
 sourceMapToPackages = map sourceToPackage . M.elems
   where
-    sourceToPackage :: PackageSource -> PackageRef
-    sourceToPackage (PSIndex _ flags _options pir) = HackagePackage (toCabalFlags flags) pir
-    sourceToPackage (PSFiles lp _) =
-      let pkg = lpPackage lp
-          ident = PackageIdentifier (packageName pkg) (packageVersion pkg)
-      in NonHackagePackage (toCabalFlags $ packageFlags pkg) ident (lpLocation lp)
-    toCabalFlags fs = [ (toCabalFlagName f0, enabled)
-                      | (f0, enabled) <- M.toList fs ]
-
+    sourceToPackage :: DepPackage -> PackageRef
+    sourceToPackage dPkg = 
+      let loc = dpLocation dPkg
+          cPkg = dpCommon dPkg
+      in
+        case loc of
+          PLImmutable (PLIHackage pir _ _) -> HackagePackage (M.toList . cpFlags $ cPkg) pir
+          PLImmutable (PLIRepo _repo meta) -> NonHackagePackage (M.toList . cpFlags $ cPkg) loc (pmIdent meta)
+          PLImmutable (PLIArchive _archive meta) -> NonHackagePackage (M.toList . cpFlags $ cPkg) loc (pmIdent meta)
+          PLMutable (ResolvedPath _ _) -> NonHackagePackage (M.toList . cpFlags $ cPkg) loc undefined 
 
 planAndGenerate
-  :: HasEnvConfig env
-  => BuildOptsCLI
+  :: BuildOptsCLI
   -> FilePath
   -> Maybe String
   -> Args
   -> Version
-  -> RIO env ()
+  -> RIO BuildConfig ()
 planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcVersion = do
-  (_targets, _mbp, _locals, _extraToBuild, sourceMap) <- loadSourceMapFull
-    NeedTargets
-    boptsCli
+  envConfig <- setupEnv NeedTargets boptsCli Nothing
+  let sourceMap = envConfigSourceMap envConfig
+  let deps = smDeps sourceMap
 
   -- Stackage lists bin-package-db but it's in GHC 7.10's boot libraries
-  binPackageDb <- parsePackageName "bin-package-db"
-  let pkgs = sourceMapToPackages (M.delete binPackageDb sourceMap)
+  binPackageDb <- parsePackageNameThrowing "bin-package-db"
+  let projectPackages = M.elems 
+                        . M.map
+                        (\ projectPackage ->
+                        let dir = ppResolvedDir projectPackage 
+                            cPkg = ppCommon projectPackage
+                        in NonHackagePackage (M.toList . cpFlags $ cPkg) (PLMutable dir) (PackageIdentifier (cpName . ppCommon $ projectPackage) nullVersion)
+                        )
+                        . smProject 
+                        $ sourceMap
+  let pkgs = sourceMapToPackages (M.delete binPackageDb deps) <> projectPackages
   liftIO $ logDebug args $ "plan:\n" ++ show pkgs
 
-  hackageDB <- liftIO $ loadHackageDB Nothing argHackageSnapshot
-  buildConf <- envConfigBuildConfig <$> view envConfigL
-  drvs      <- liftIO $ mapPool
+  hackageDB     <- liftIO $ loadHackageDB Nothing argHackageSnapshot
+  let buildConf = envConfigBuildConfig envConfig
+  drvs          <- liftIO $ mapPool
     argThreads
     (\p ->
       fmap (addGhcOptions buildConf p)
         <$> genNixFile args ghcVersion baseDir remoteUri argRev hackageDB p
     )
     pkgs
-  let locals = map (\l -> show (packageName (lpPackage l))) _locals
-  liftIO . render drvs args locals $ nixVersion ghcVersion
+  let locals = M.elems . M.map (\ local -> show . cpName . ppCommon $ local) . smProject $ sourceMap
+  liftIO . render drvs args locals $ (mconcat . map show . versionNumbers $ ghcVersion)
 
 -- | Add ghc-options declared in stack.yaml to the nix derivation for a package
 --   by adding to the configureFlags attribute of the derivation
@@ -135,16 +151,13 @@ addGhcOptions buildConf pkgRef drv =
  where
   stackGhcOptions :: Set String
   stackGhcOptions =
-    Set.fromList . map (unpack . ("--ghc-option=" <>)) $ getGhcOptions
-      buildConf
-      buildOpts
-      pkgName
-      False
-      False
+    let config = bcConfig buildConf
+        opts   = fromMaybe [] . M.lookup pkgName . configGhcOptionsByName $ config
+    in Set.fromList . map (unpack . ("--ghc-option=" <>)) $ opts
   pkgName :: PackageName
   pkgName = case pkgRef of
-    HackagePackage _ (PackageIdentifierRevision (PackageIdentifier n _) _) -> n
-    NonHackagePackage _ (PackageIdentifier n _) _                          -> n
+    HackagePackage _ (PackageIdentifier n  _) -> n
+    NonHackagePackage  _ _ (PackageIdentifier n _) -> n
 
 runPlan :: FilePath
         -> Maybe String
@@ -153,49 +166,55 @@ runPlan :: FilePath
 runPlan baseDir remoteUri args@Args{..} = do
   let stackRoot = "/tmp/s2n"
   createDirectoryIfMissing True stackRoot
-  let globals = globalOpts baseDir stackRoot args
+  
+  baseDir' <- parseAbsDir =<< makeAbsolute baseDir
+  stackYaml <- parseRelFile argStackYaml
+
+  globals <- globalOpts baseDir' stackRoot stackYaml args
   let stackFile = baseDir </> argStackYaml
 
   ghcVersion <- getGhcVersionIO globals stackFile
   when argEnsureExecutables $
-    ensureExecutable ("haskell.compiler.ghc" ++ nixVersion ghcVersion)
-  withBuildConfig globals $ planAndGenerate buildOpts baseDir remoteUri args ghcVersion
-
-nixVersion :: Version -> String
-nixVersion =
-  filter (/= '.') . show
+    ensureExecutable ("haskell.compiler.ghc" ++ (mconcat . map show . versionNumbers $ ghcVersion))
+  withRunnerGlobal globals $ withConfig NoReexec $ withBuildConfig $ planAndGenerate buildOpts baseDir remoteUri args ghcVersion
 
 getGhcVersionIO :: GlobalOpts -> FilePath -> IO Version
-getGhcVersionIO go stackFile = do
-  cp <- canonicalizePath stackFile
-  fp <- parseAbsFile cp
-  lc <- withRunner LevelError True False ColorAuto Nothing False $ \runner ->
-    -- https://www.fpcomplete.com/blog/2017/07/the-rio-monad
-    runRIO runner $ loadConfig mempty Nothing (SYLOverride fp)
-  getGhcVersion <$> loadCompilerVersion go lc
+getGhcVersionIO go _stackFile = do
+  ver <- getGhcVersion . wantedToActual <$> (withRunnerGlobal go $ loadConfig $ \ _config -> withConfig NoReexec $ withBuildConfig $ 
+    view wantedCompilerVersionL)
+  return ver
 
-globalOpts :: FilePath -> FilePath -> Args -> GlobalOpts
-globalOpts currentDir stackRoot Args{..} =
-  go { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
+-- globalOpts :: FilePath -> FilePath -> Args -> GlobalOpts
+globalOpts 
+  :: MonadIO m
+  => Path Abs Dir
+  -> String
+  -> Path Rel File
+  -> Args
+  -> m GlobalOpts
+globalOpts currentDir stackRoot stackYaml Args{..} = do
+  opts <- go
+  return $ opts { globalReExecVersion = Just "1.5.1" -- TODO: obtain from stack lib if exposed
      , globalConfigMonoid =
-         (globalConfigMonoid go)
+         (globalConfigMonoid opts)
          { configMonoidNixOpts = mempty
            { nixMonoidEnable = First (Just True)
            }
          }
-     , globalStackYaml = SYLOverride (currentDir </> argStackYaml)
+     , globalStackYaml = SYLOverride $ currentDir Path.</> stackYaml
      , globalLogLevel = if argVerbose then LevelDebug else LevelInfo
      }
   where
-    pinfo = info (globalOptsParser currentDir OuterGlobalOpts (Just LevelError)) briefDesc
+    pinfo = info (globalOptsParser (fromAbsDir currentDir) OuterGlobalOpts (Just LevelError)) briefDesc
     args = concat [ ["--stack-root", stackRoot]
                   , ["--jobs", show argThreads]
                   , ["--test" | argTest]
                   , ["--bench" | argBench]
                   , ["--haddock" | argHaddock]
                   , ["--no-install-ghc"]
+                  , ["--system-ghc"]
                   ]
-    go = globalOptsFromMonoid False ColorNever . fromJust . getParseResult $
+    go = globalOptsFromMonoid False . fromJust . getParseResult $
       execParserPure defaultPrefs pinfo args
 
 buildOpts :: BuildOptsCLI

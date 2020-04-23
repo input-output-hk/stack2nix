@@ -10,5 +10,5 @@ flags:
 nix:
   packages: [zlib,gmp,git,pcre,openssl]
 
-# ghc-options:
-# stack2nix: -Werror
+ghc-options:
+  stack2nix: -Werror

@@ -8,12 +8,14 @@ module Stack2nix.External.Cabal2nix (
 import           Cabal2nix                   (cabal2nixWithDB, parseArgs, optNixpkgsIdentifier, Options)
 import           Control.Lens
 import           Data.Bool                   (bool)
+import           Data.List                   (intercalate)
 import           Data.Maybe                  (fromMaybe, maybeToList)
 import           Data.Text                   (Text, unpack)
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
 import           Distribution.PackageDescription (unFlagName)
 import           Distribution.System         (Platform(..), Arch(..), OS(..))
+import           Distribution.Types.Version  (versionNumbers)
 import           Language.Nix
 import           System.IO                   (hPutStrLn, stderr)
 import           Stack.Types.Version         (Version)
@@ -35,7 +37,7 @@ cabal2nix Args{..} ghcVersion uri commit subpath flags hackageDB = do
       , maybeToList argCabal2nixArgs
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
-      , ["--compiler", "ghc-" ++ show ghcVersion]
+      , ["--compiler", "ghc-" ++ (intercalate "." . map show . versionNumbers $ ghcVersion )]
       , ["-f" ++ bool "-" "" enable ++ unFlagName f | (f, enable) <- flags]
       , [uri]
       ]
