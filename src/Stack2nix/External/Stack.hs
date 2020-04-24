@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Stack2nix.External.Stack
   ( PackageRef(..), runPlan
@@ -17,6 +18,8 @@ import           Data.Text                                      (pack, unpack)
 import           Distribution.Nixpkgs.Haskell.Derivation        (Derivation,
                                                                  configureFlags)
 import qualified Distribution.Nixpkgs.Haskell.Hackage           as DB
+import           Language.Haskell.TH                            (runIO,)
+import           Language.Haskell.TH.Syntax                     (qAddDependentFile)
 import           Options.Applicative
 import           Path                                           (parseAbsFile)
 import           Stack.Build.Source                             (getGhcOptions, loadSourceMapFull)
@@ -125,7 +128,10 @@ planAndGenerate boptsCli baseDir remoteUri args@Args {..} ghcVersion = do
     )
     pkgs
   let locals = map (\l -> show (packageName (lpPackage l))) _locals
-  liftIO . render drvs args locals $ nixVersion ghcVersion
+  basePackageNames <- case M.lookup (show ghcVersion) ghcBaseLibsMap of
+    Nothing -> fail $ "GHC version " ++ show ghcVersion ++ " was not in compiled-in pkg_versions.txt!"
+    Just names -> pure (Set.fromList names)
+  liftIO $ render drvs args locals (nixVersion ghcVersion) basePackageNames
 
 -- | Add ghc-options declared in stack.yaml to the nix derivation for a package
 --   by adding to the configureFlags attribute of the derivation
@@ -200,3 +206,28 @@ globalOpts currentDir stackRoot Args{..} =
 
 buildOpts :: BuildOptsCLI
 buildOpts = fromJust . getParseResult $ execParserPure defaultPrefs (info (buildOptsParser Build) briefDesc) ["--dry-run"]
+
+ghcBaseLibsMap :: Map String [String]
+ghcBaseLibsMap =
+  $$(do
+    -- From https://github.com/bgamari/ghc-utils/blob/master/library-versions/pkg_versions.txt
+    let path = "pkg_versions.txt"
+    qAddDependentFile path
+    s <- runIO $ readFile path
+
+    let nonCommentLines :: [String]
+        nonCommentLines =
+          [ l | l@(firstChar:_) <- lines s, firstChar /= '#' ]
+
+    let ghcsWithLibNames :: Map String [String]
+        -- `fromListWith (++)` because the Win32 information is in a separate
+        -- section on the top of `pkg_versions.txt`, for the same keys; that
+        -- needs to be merged in.
+        ghcsWithLibNames = M.fromListWith (++) $
+          [ (ghc, libNames)
+          | ghc:libs <- map words nonCommentLines
+          , let libNames = map (takeWhile (/= '/')) libs
+          ]
+
+    [|| ghcsWithLibNames ||]
+  )
