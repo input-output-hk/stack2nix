@@ -1,16 +1,22 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main ( main ) where
 
-import           Data.Semigroup            ((<>))
+import           Data.List                 (intercalate, isPrefixOf)
+import           Data.List.Split           (splitOn)
+import           Data.Maybe                (fromMaybe, listToMaybe)
 import           Data.Time                 (UTCTime, defaultTimeLocale,
                                             parseTimeM)
-import qualified Distribution.Compat.ReadP as P
+import           Data.Version              (showVersion)
 import           Distribution.System       (Arch (..), OS (..), Platform (..),
-                                            buildPlatform)
+                                            ClassificationStrictness(..),
+                                            buildPlatform, classifyArch, classifyOS)
 import           Distribution.Text         (display)
 import           Options.Applicative
 import           Stack2nix
 import           System.IO                 (BufferMode (..), hSetBuffering,
                                             stderr, stdout)
+
 
 args :: Parser Args
 args = Args
@@ -22,7 +28,7 @@ args = Args
        <*> switch (long "bench" <> help "enable benchmarks")
        <*> switch (long "haddock" <> help "enable documentation generation")
        <*> optional (option utcTimeReader (long "hackage-snapshot" <> help "hackage snapshot time, ISO format"))
-       <*> option (readP platformReader) (long "platform" <> help "target platform to use when invoking stack or cabal2nix" <> value buildPlatform <> showDefaultWith display)
+       <*> option (maybeReader parsePlatform) (long "platform" <> help "target platform to use when invoking stack or cabal2nix" <> value buildPlatform <> showDefaultWith display)
        <*> strArgument (metavar "URI")
        <*> flag True False (long "no-indent" <> help "disable indentation and place one item per line")
        <*> switch (long "verbose" <> help "verbose output")
@@ -39,26 +45,49 @@ args = Args
 
     -- | A String parser for Distribution.System.Platform
     -- | Copied from cabal2nix/src/Cabal2nix.hs
-    platformReader :: P.ReadP r Platform
-    platformReader = do
-      arch <- P.choice
-          [ P.string "i686" >> return I386
-          , P.string "x86_64" >> return X86_64
-          ]
-      _ <- P.char '-'
-      os <- P.choice
-          [ P.string "linux" >> return Linux
-          , P.string "osx" >> return OSX
-          , P.string "darwin" >> return OSX
-          ]
-      return (Platform arch os)
+    parsePlatform :: String -> Maybe Platform
+    parsePlatform = parsePlatformParts . splitOn "-"
 
-    readP :: P.ReadP a a -> ReadM a
-    readP p = eitherReader $ \s ->
-      case [ r' | (r',"") <- P.readP_to_S p s ] of
-        (r:_) -> Right r
-        _     -> Left ("invalid value " ++ show s)
+    parsePlatformParts :: [String] -> Maybe Platform
+    parsePlatformParts = \case
+      [arch, os] ->
+        Just $ Platform (parseArch arch) (parseOS os)
+      (arch : _ : osParts) ->
+        Just $ Platform (parseArch arch) $ parseOS $ intercalate "-" osParts
+      _ -> Nothing
 
+    parseArch :: String -> Arch
+    parseArch = classifyArch Permissive . ghcConvertArch
+
+    parseOS :: String -> OS
+    parseOS = classifyOS Permissive . ghcConvertOS
+    ghcConvertArch :: String -> String
+    ghcConvertArch arch = case arch of
+      "i486"  -> "i386"
+      "i586"  -> "i386"
+      "i686"  -> "i386"
+      "amd64" -> "x86_64"
+      _ -> fromMaybe arch $ listToMaybe
+        [prefix | prefix <- archPrefixes, prefix `isPrefixOf` arch]
+      where archPrefixes =
+              [ "aarch64", "alpha", "arm", "hppa1_1", "hppa", "m68k", "mipseb"
+              , "mipsel", "mips", "powerpc64le", "powerpc64", "powerpc", "s390x"
+              , "sparc64", "sparc"
+              ]
+
+    -- | Replicate the normalization performed by GHC_CONVERT_OS in GHC's aclocal.m4
+    -- since the output of that is what Cabal parses.
+    ghcConvertOS :: String -> String
+    ghcConvertOS os = case os of
+      "watchos"       -> "ios"
+      "tvos"          -> "ios"
+      "linux-android" -> "linux-android"
+      "linux-androideabi" -> "linux-androideabi"
+      _ | "linux-" `isPrefixOf` os -> "linux"
+      _ -> fromMaybe os $ listToMaybe
+        [prefix | prefix <- osPrefixes, prefix `isPrefixOf` os]
+      where osPrefixes =
+              [ "gnu", "openbsd", "aix", "darwin", "solaris2", "freebsd", "nto-qnx"]
 
 main :: IO ()
 main = do
@@ -68,7 +97,7 @@ main = do
   where
     opts = info
       (helper
-       <*> infoOption ("stack2nix " ++ display version) (long "version" <> help "Show version number")
+       <*> infoOption ("stack2nix " ++ showVersion version) (long "version" <> help "Show version number")
        <*> args) $
       fullDesc
       <> progDesc "Generate a nix expression for a Haskell package using stack"

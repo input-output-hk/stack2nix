@@ -1,5 +1,6 @@
 module Stack2nix.Types where
 
+import           Data.Text                       (Text)
 import           Data.Time                       (UTCTime)
 import           Distribution.PackageDescription (FlagName)
 import           Distribution.System             (Platform)
@@ -23,3 +24,5 @@ data Args = Args
   deriving (Show)
 
 type Flags = [(FlagName, Bool)]
+
+type GhcOptions = [Text]

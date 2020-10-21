@@ -1,6 +1,5 @@
 module Stack2nix.External.Util where
 
-import           Data.Monoid      ((<>))
 import           System.Directory (getCurrentDirectory)
 import           System.Exit      (ExitCode (..))
 import           System.Process   (CreateProcess (..), proc,

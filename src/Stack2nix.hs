@@ -10,7 +10,8 @@ module Stack2nix
 
 import           Control.Monad              (unless, void, when)
 import           Data.Maybe                 (isJust)
-import           Data.Monoid                ((<>))
+import           Path
+import           Path.IO
 import           Paths_stack2nix            (version)
 import           Stack2nix.External.Stack
 import           Stack2nix.External.Util    (runCmdFrom, failHard)
@@ -18,11 +19,7 @@ import           Stack2nix.External.VCS.Git (Command (..), ExternalCmd (..),
                                              InternalCmd (..), git)
 import           Stack2nix.Types            (Args (..))
 import           Stack2nix.Util
-import           System.Directory           (doesFileExist,
-                                             getCurrentDirectory, withCurrentDirectory)
 import           System.Environment         (getEnv, setEnv)
-import           System.FilePath            ((</>))
-import           System.IO.Temp             (withSystemTempDirectory)
 
 stack2nix :: Args -> IO ()
 stack2nix args@Args{..} = do
@@ -36,15 +33,16 @@ stack2nix args@Args{..} = do
   updateCabalPackageIndex
   -- cwd <- getCurrentDirectory
   -- let projRoot = if isAbsolute argUri then argUri else cwd </> argUri
-  let projRoot = argUri
-  isLocalRepo <- doesFileExist $ projRoot </> argStackYaml
+  projRoot <- resolveDir' argUri
+  stackYaml <- resolveFile projRoot argStackYaml
+  isLocalRepo <- doesFileExist stackYaml
   logDebug args $ "stack2nix (isLocalRepo): " ++ show isLocalRepo
   logDebug args $ "stack2nix (projRoot): " ++ show projRoot
   logDebug args $ "stack2nix (argUri): " ++ show argUri
   if isLocalRepo
   then handleStackConfig Nothing projRoot
-  else withSystemTempDirectory "s2n-" $ \tmpDir ->
-    tryGit tmpDir >> handleStackConfig (Just argUri) tmpDir
+  else withSystemTempDir "s2n-" $ \tmpDir ->
+    tryGit (fromAbsDir tmpDir) >> handleStackConfig (Just argUri) tmpDir
   where
     updateCabalPackageIndex :: IO ()
     updateCabalPackageIndex = do
@@ -59,17 +57,17 @@ stack2nix args@Args{..} = do
         Just r  -> void $ git $ InsideRepo tmpDir (Checkout r)
         Nothing -> return mempty
 
-    handleStackConfig :: Maybe String -> FilePath -> IO ()
+    handleStackConfig :: Maybe String -> Path Abs Dir -> IO ()
     handleStackConfig remoteUri localDir = do
-      cwd <- getCurrentDirectory
-      logDebug args $ "handleStackConfig (cwd): " ++ cwd
-      logDebug args $ "handleStackConfig (localDir): " ++ localDir
+      cwd <- getCurrentDir
+      logDebug args $ "handleStackConfig (cwd): " ++ fromAbsDir cwd
+      logDebug args $ "handleStackConfig (localDir): " ++ fromAbsDir localDir
       logDebug args $ "handleStackConfig (remoteUri): " ++ show remoteUri
-      let stackFile = localDir </> argStackYaml
+      stackFile <- resolveFile localDir argStackYaml
       alreadyExists <- doesFileExist stackFile
-      unless alreadyExists $ error $ stackFile <> " does not exist. Use 'stack init' to create it."
+      unless alreadyExists $ error $ fromAbsFile stackFile <> " does not exist. Use 'stack init' to create it."
       logDebug args $ "handleStackConfig (alreadyExists): " ++ show alreadyExists
       let go = if isJust remoteUri
-               then withCurrentDirectory localDir
+               then withCurrentDir localDir
                else id
       go $ runPlan localDir remoteUri args

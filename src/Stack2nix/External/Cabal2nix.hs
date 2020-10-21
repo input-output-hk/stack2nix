@@ -13,6 +13,7 @@ import           Data.Text                   (Text, unpack)
 import qualified Distribution.Nixpkgs.Haskell.Hackage as DB
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation)
 import           Distribution.PackageDescription (unFlagName)
+import           Distribution.Pretty         (prettyShow)
 import           Distribution.System         (Platform(..), Arch(..), OS(..))
 import           Language.Nix
 import           System.IO                   (hPutStrLn, stderr)
@@ -35,7 +36,7 @@ cabal2nix Args{..} ghcVersion uri commit subpath flags hackageDB = do
       , maybeToList argCabal2nixArgs
       , ["--subpath", dir]
       , ["--system", fromCabalPlatform argPlatform]
-      , ["--compiler", "ghc-" ++ show ghcVersion]
+      , ["--compiler", "ghc-" ++ prettyShow ghcVersion]
       , ["-f" ++ bool "-" "" enable ++ unFlagName f | (f, enable) <- flags]
       , [uri]
       ]

@@ -10,13 +10,13 @@ import           Control.Lens
 import           Control.Monad                           (when)
 import qualified Data.ByteString                         as BS
 import           Data.Either                             (lefts, rights)
-import           Data.List                               (filter, isPrefixOf,
+import           Data.List                               (isPrefixOf,
                                                           sort)
-import           Data.Monoid                             ((<>))
 import           Data.Set                                (Set)
 import qualified Data.Set                                as Set
 import qualified Data.Text                               as Text
 import           Data.Text.Encoding                      (encodeUtf8)
+import           Data.Version                            (showVersion)
 import           Distribution.Nixpkgs.Haskell.BuildInfo  (haskell, pkgconfig,
                                                           system, tool)
 import           Distribution.Nixpkgs.Haskell.Derivation (Derivation,
@@ -24,20 +24,18 @@ import           Distribution.Nixpkgs.Haskell.Derivation (Derivation,
                                                           dependencies, doCheck,
                                                           pkgid, runHaddock,
                                                           testDepends)
-import           Distribution.Text                       (display)
 import           Distribution.Types.PackageId            (PackageIdentifier (..),
                                                           pkgName)
 import           Distribution.Types.PackageName          (unPackageName)
 import           Language.Nix                            (path)
 import           Language.Nix.Binding                    (Binding, reference)
-import           Language.Nix.PrettyPrinting             (disp)
 import           Paths_stack2nix                         (version)
 import           Stack2nix.Types                         (Args (..))
 import           Stack2nix.PP                            (ppIndented, ppSingletons)
 import           System.IO                               (hPutStrLn, stderr)
 import qualified Text.PrettyPrint                        as PP
 import           Text.PrettyPrint.HughesPJClass          (Doc, fcat, nest,
-                                                          pPrint, punctuate,
+                                                          pPrint, prettyShow, punctuate,
                                                           semi, space, text)
 
 render :: [Either Doc Derivation] -> Args -> [String] -> String -> Set String -> IO ()
@@ -73,11 +71,11 @@ renderOne args locals drv' = nest 6 $ PP.hang
   nonXpkgs = filter
     (\e -> not
       (                      "libX"
-      `Data.List.isPrefixOf` (display (((view (reference . path) e) !! 1)))
+      `Data.List.isPrefixOf` (prettyShow (((view (reference . path) e) !! 1)))
       )
     )
     nixPkgs
-  pkgs = fcat $ punctuate space [ disp b <> semi | b <- nonXpkgs ]
+  pkgs = fcat $ punctuate space [ pPrint b <> semi | b <- nonXpkgs ]
   drv =
     filterDepends args isLocal drv'
       &  doCheck
@@ -108,7 +106,7 @@ drvToName drv = unPackageName $ pkgName $ view pkgid drv
 
 defaultNix :: (Doc -> String) -> String -> [Doc] -> String
 defaultNix pp ghcnixversion drvs = unlines $
- [ "# Generated using stack2nix " <> display version <> "."
+ [ "# Generated using stack2nix " <> showVersion version <> "."
  , ""
  , "{ pkgs ? (import <nixpkgs> {})"
  , ", compiler ? pkgs.haskell.packages.ghc" ++ ghcnixversion
