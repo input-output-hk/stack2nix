@@ -115,7 +115,7 @@ defaultNix pp ghcnixversion drvs = unlines $
  , "with pkgs.haskell.lib;"
  , ""
  , "let"
- , "  stackPackages = { pkgs, stdenv, callPackage }:"
+ , "  stackPackages = { pkgs, lib, callPackage, ... }:"
  , "    self: {"
  ] ++ (map pp drvs) ++
  [ "    };"
