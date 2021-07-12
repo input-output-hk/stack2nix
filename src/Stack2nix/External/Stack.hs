@@ -60,8 +60,10 @@ genNixFile args ghcVersion _baseDir uri argRev hackageDB pkgRef = do
     NonHackagePackage ghcOptions flags path -> do
       relPath <- fromRelDir <$> makeRelativeToCurrentDir (resolvedAbsolute path)
       let cabal2nix_uri = fromMaybe (toFilePath $ resolvedAbsolute path) uri
+      let commit = pack <$> argRev
+      let subpath = const relPath <$> uri
       fmap (addGhcOptions ghcOptions) <$>
-        cabal2nix args ghcVersion cabal2nix_uri (pack <$> argRev) (const relPath <$> uri) flags hackageDB
+        cabal2nix args ghcVersion cabal2nix_uri commit subpath flags hackageDB
 
 -- TODO: remove once we use flags, options
 sourceMapToPackages :: SourceMap -> [PackageRef]
