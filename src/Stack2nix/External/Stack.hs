@@ -144,6 +144,7 @@ globalOpts currentDir stackRoot Args{..} = do
                { configMonoidNixOpts = mempty
                  { nixMonoidEnable = First (Just True)
                  }
+               , configMonoidSystemGHC = First (Just True)
                }
              , globalStackYaml = SYLOverride globalStackYaml
              , globalLogLevel = if argVerbose then LevelDebug else LevelInfo
@@ -156,6 +157,7 @@ globalOpts currentDir stackRoot Args{..} = do
                   , ["--bench" | argBench]
                   , ["--haddock" | argHaddock]
                   , ["--no-install-ghc"]
+                  , ["--system-ghc"]
                   ]
 
 buildOpts :: BuildOptsCLI
