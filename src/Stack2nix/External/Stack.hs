@@ -52,16 +52,16 @@ data PackageRef
   deriving (Eq, Show)
 
 genNixFile :: Args -> Version -> Path Abs Dir -> Maybe String -> Maybe String -> DB.HackageDB -> PackageRef -> IO (Either Doc Derivation)
-genNixFile args ghcVersion baseDir uri argRev hackageDB pkgRef = do
+genNixFile args ghcVersion _baseDir uri argRev hackageDB pkgRef = do
   case pkgRef of
     HackagePackage ghcOptions flags pkgId ->
       fmap (addGhcOptions ghcOptions) <$>
         cabal2nix args ghcVersion ("cabal://" <> packageIdentifierString pkgId) Nothing Nothing flags hackageDB
     NonHackagePackage ghcOptions flags path -> do
       relPath <- fromRelDir <$> makeRelativeToCurrentDir (resolvedAbsolute path)
-      defDir <- fromRelDir <$> makeRelative baseDir (resolvedAbsolute path)
+      let cabal2nix_uri = fromMaybe (toFilePath $ resolvedAbsolute path) uri
       fmap (addGhcOptions ghcOptions) <$>
-        cabal2nix args ghcVersion (fromMaybe defDir uri) (pack <$> argRev) (const relPath <$> uri) flags hackageDB
+        cabal2nix args ghcVersion cabal2nix_uri (pack <$> argRev) (const relPath <$> uri) flags hackageDB
 
 -- TODO: remove once we use flags, options
 sourceMapToPackages :: SourceMap -> [PackageRef]
