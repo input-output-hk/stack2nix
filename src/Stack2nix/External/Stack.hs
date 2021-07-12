@@ -131,7 +131,7 @@ nixVersion :: Version -> String
 nixVersion =
   filter (/= '.') . prettyShow
 
-globalOpts :: MonadIO m => Path Abs Dir -> Path Rel File -> Args -> m GlobalOpts
+globalOpts :: MonadIO m => Path Abs Dir -> Path b Dir -> Args -> m GlobalOpts
 globalOpts currentDir stackRoot Args{..} = do
   go0 <- globalOptsFromMonoid False . fromJust . getParseResult $
       execParserPure defaultPrefs pinfo args
